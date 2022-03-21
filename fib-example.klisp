@@ -1,15 +1,15 @@
 (println 'Fibonacci 1-20:')
 
 (defn fib (n)
-      (if (< n 2)
-        1
-        (+ (fib (- n 1))
-           (fib (- n 2)))))
+	  (if (< n 2)
+		1
+		(+ (fib (- n 1))
+		   (fib (- n 2)))))
 
 (-> (nat 20)
-    (each (fn (n)
-              (println 'Fib of'
-                       n
-                       'is'
-                       (fib n)))))
+	(each (fn (n)
+			  (println 'Fib of'
+					   n
+					   'is'
+					   (fib n)))))
 

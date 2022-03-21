@@ -1,25 +1,23 @@
 ; random library, implementing utilities for working
 ; with pseudorandom sources of randomness
-;
-; depends on klisp.klisp
 
 (defn rand-bool ()
-	  (< (rand) 0.5))
+      (< (rand) 0.5))
 
 (defn rand-int (min max)
-	  (int (rand-number (int min)
-						(int max))))
+      (int (rand-number (int min)
+                        (int max))))
 
 (defn rand-number (min max)
-	  (do
-		(when (nil? max)
-		  (do
-			(def max min)
-			(def min 0)))
-		(+ min
-		   (* (rand) (- max min)))))
+      (do
+        (when (nil? max)
+          (do
+            (def max min)
+            (def min 0)))
+        (+ min
+           (* (rand) (- max min)))))
 
 (defn rand-choice (xs)
-	  (nth xs
-		   (rand-int 0 (size xs))))
+      (nth xs
+           (rand-int 0 (size xs))))
 

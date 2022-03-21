@@ -1,5 +1,4 @@
 ; sort library, implementing quicksort
-; depends on klisp.klisp
 
 (defn sort! (xs pred)
       (do

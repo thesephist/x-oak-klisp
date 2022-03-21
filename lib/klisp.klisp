@@ -43,11 +43,12 @@
            (sets! x (len x) y)
            ; O(n^2) behavior with linked lists
            (do
-             (defn -<< (x )
-                   (if (= x ())
-                     (cons y ())
-                     (cons (car x)
-                           (-<< (cdr x) y))))
+             (def -<<
+                  (fn (x)
+                      (if (= x ())
+                        (cons y ())
+                        (cons (car x)
+                              (-<< (cdr x) y)))))
              (-<< x y)))))
 (def eq? =)
 (def not !)
@@ -463,12 +464,13 @@
 (def reverse
      (fn (x)
          (do
-           (defn -reverse (acc x)
-                 (if (nil? x)
-                   acc
-                   (-reverse (cons (car x)
-                                   acc)
-                             (cdr x))))
+           (def -reverse
+                (fn (acc x)
+                    (if (nil? x)
+                      acc
+                      (-reverse (cons (car x)
+                                      acc)
+                                (cdr x)))))
            (-reverse () x))))
 
 (def map
@@ -581,8 +583,9 @@
                                   (+ prefix joiner (car xs))))))
              (cat-onto (cdr xs) (car xs))))))
 
-(defn char-at (s i)
-      (gets s i (inc i)))
+(def char-at
+     (fn (s i)
+         (gets s i (inc i))))
 
 ; composites: persistent immutable associative array
 ;

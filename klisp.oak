@@ -487,6 +487,10 @@ fn loadLibSources(libs, withEnv) {
 }
 
 fn loadStdlib(withEnv) loadLibSources([
+	// NOTE: when klisp.oak gets built, these placeholder strings are replaced
+	// with the contents of the library source files by the build script.
+	//
+	// In the Ink-based Klisp CLI, this loading of libraries is asynchronous.
 	'{{ lib/klisp }}'
 	'{{ lib/str }}'
 	'{{ lib/math }}'

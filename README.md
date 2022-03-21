@@ -8,6 +8,7 @@ This repo started out as a sort of a (manual, partial) fork of [thesephist/klisp
 
 ## Todos
 
+- Finish `lib/str` library
 - File I/O APIs
 - auto-indent in the repl, based on parser errors
 - let\* (or make let polymorphic)
