@@ -1,0 +1,47 @@
+; sort library, implementing quicksort
+; depends on klisp.klisp
+
+(defn sort! (xs pred)
+      (do
+        (default pred id)
+        (def vpred (map xs pred))
+        (defn partition (xs lo hi)
+              (let (pivot (nth vpred lo))
+                (do
+                  (defn lsub (i)
+                        (if (< (nth vpred i) pivot)
+                          (lsub (inc i))
+                          i))
+                  (defn rsub (j)
+                        (if (> (nth vpred j) pivot)
+                          (rsub (dec j))
+                          j))
+                  (defn sub (i j)
+                        (do
+                          (def i (lsub i))
+                          (def j (rsub j))
+                          (if (< i j)
+                            (do
+                              (def tmp (nth xs i))
+                              (def tmpPred (nth vpred i))
+                              (nth! xs i (nth xs j))
+                              (nth! xs j tmp)
+                              (nth! vpred i (nth vpred j))
+                              (nth! vpred j tmpPred)
+                              (sub (inc i) (dec j)))
+                            j)))
+                  (sub lo hi))))
+        (defn quicksort (xs lo hi)
+              (if (| (< (size xs) 2)
+                     (>= lo hi))
+                xs
+                (let (p (partition xs lo hi))
+                  (do
+                    (quicksort xs lo p)
+                    (quicksort xs (inc p) hi)))))
+        (quicksort xs 0 (dec (size xs)))))
+
+(defn sort (xs pred)
+      (-> (slice xs)
+          (sort! pred)))
+

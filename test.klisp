@@ -1,0 +1,10 @@
+; behavior test suite
+
+(run-tests
+  (test 'basic addition'
+        4
+        (+ 2 2))
+  (test 'basic subtraction'
+        5
+        (- 10 5)))
+

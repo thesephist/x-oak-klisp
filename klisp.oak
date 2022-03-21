@@ -1,0 +1,526 @@
+#!/usr/bin/env oak
+
+// A Klisp written in Oak
+// ported over from the Ink implementation at thesephist/klisp.
+
+{
+	println: println
+	default: default
+	clone: clone
+	slice: slice
+	map: map
+	find: find
+	reduce: reduce
+	fromHex: fromHex
+} := import('std')
+{
+	join: join
+	replace: replace
+	trim: trim
+	endsWith?: endsWith?
+} := import('str')
+fmt := import('fmt')
+fs := import('fs')
+
+// alias print, because it will be overridden later
+oakPrint := print
+
+// like std.reduce, but works on lisp lists
+fn reduceSexpr(L, init, f) {
+	fn sub(acc, node) if node {
+		? -> acc
+		_ -> sub(f(acc, node.0), node.1)
+	}
+	sub(init, L)
+}
+
+fn Reader(s) {
+	i := 0
+
+	fn peek() s.(i)
+	fn peekAhead(n) s.(i + n)
+	fn next {
+		c := peek()
+		i <- i + 1
+		c
+	}
+	fn nextSpan {
+		fn sub(acc) if peek() {
+			?, ' ', '\n', '\t', '(', ')' -> acc
+			_ -> sub(acc << next())
+		}
+		sub('')
+	}
+	fn forward {
+		fn sub() if peek() {
+			' ', '\n', '\t' -> {
+				next()
+				sub()
+			}
+			// ignore comments
+			';' -> {
+				fn sub() if next() {
+					? -> ?
+					'\n' -> forward()
+					_ -> sub()
+				}
+				sub()
+			}
+		}
+		sub()
+	}
+
+	{
+		peek: peek
+		peekAhead: peekAhead
+		next: next
+		nextSpan: nextSpan
+		forward: forward
+	}
+}
+
+fn read(s) {
+	r := Reader(s |> trim())
+
+	{
+		peek: peek
+		peekAhead: peekAhead
+		next: next
+		nextSpan: nextSpan
+		forward: forward
+	} := r
+
+	// forward through possible comments at start
+	forward()
+
+	fn parse() if c := peek() {
+		? -> ? // eof
+		')' -> ? // halt parsing
+		',' -> {
+			next()
+			forward()
+			[:quote, [parse(), ?]]
+		}
+		'\'' -> {
+			next()
+			fn sub(acc) if peek() {
+				? -> acc
+				'\\' -> {
+					next()
+					sub(
+						acc << if d := next() {
+							't' -> '\t'
+							'n' -> '\n'
+							'r' -> '\r'
+							'f' -> '\f'
+							'x' -> {
+								a := peek() |> default(' ')
+								b := peekAhead(1) |> default(' ')
+								maybeHexDigits := if hex := fromHex(a + b) {
+									? -> 'x'
+									_ -> {
+										next()
+										next()
+										char(hex)
+									}
+								}
+							}
+							_ -> d
+						}
+					)
+				}
+				'\'' -> {
+					next()
+					forward()
+					acc
+				}
+				_ -> sub(acc << next())
+			}
+			sub('')
+		}
+		'(' -> {
+			next()
+			forward()
+			fn sub(acc, tail) if peek() {
+				? -> acc
+				')' -> {
+					next()
+					acc
+				}
+				'.' -> {
+					next()
+					forward()
+					cons := parse()
+					forward()
+					acc := if acc {
+						? -> cons
+						_ -> {
+							tail.1 := cons
+							acc
+						}
+					}
+					sub(acc, cons)
+				}
+				_ -> {
+					cons := [parse(), ?]
+					forward()
+					acc := if acc {
+						? -> cons
+						_ -> {
+							tail.1 := cons
+							acc
+						}
+					}
+					sub(acc, cons)
+				}
+			}
+			sub(?, ?)
+		}
+		_ -> {
+			span := nextSpan()
+			forward()
+			if {
+				? != x := int(span) -> x
+				? != x := float(span) -> x
+				span = '_' -> _
+				_ -> atom(span)
+			}
+		}
+	}
+
+	term := [parse(), ?]
+	prog := [:do, term]
+	fn sub(tail) if peek() {
+		?, ')' -> prog
+		_ -> {
+			term := [parse(), ?]
+			tail.1 := term
+			forward()
+			sub(term)
+		}
+	}
+	sub(term)
+}
+
+// globally unique sentinel values
+LispNull := fn {}
+LispEmpty := fn {}
+
+fn getv(env, name) if v := env.(string(name)) {
+	? -> if e := env.'-env' {
+		? -> ?
+		_ -> getv(e, string(name))
+	}
+	LispNull -> ?
+	LispEmpty -> _
+	_ -> v
+}
+
+fn setv(env, name, v) if type(v) {
+	:null -> env.(string(name)) := LispNull
+	:empty -> env.(string(name)) := LispEmpty
+	_ -> env.(string(name)) := v
+}
+
+fn makeFn(f, L) [false, f, L]
+fn makeMacro(f, L) [true, f, L]
+fn makeNative(f) makeFn(f, ?)
+
+fn eval(L, env) if type(L) {
+	:list -> if L.0 {
+		:quote -> L.(1).0
+		:def -> {
+			name := L.(1).0
+			val := eval(L.(1).(1).0, env)
+			setv(env, name, val)
+			val
+		}
+		:do -> {
+			fn sub(form) if form.1 {
+				? -> eval(form.0, env)
+				_ -> {
+					eval(form.0, env)
+					sub(form.1)
+				}
+			}
+			sub(L.1)
+		}
+		:if -> {
+			cond := L.(1).0
+			conseq := L.(1).(1).0
+			altern := L.(1).(1).(1).0
+			eval(
+				if eval(cond, env) {
+					true -> conseq
+					_ -> altern
+				}
+				env
+			)
+		}
+		:fn -> {
+			params := L.(1).0
+			body := L.(1).(1).0
+			makeFn(fn(args) eval(
+				body
+				{
+					fn sub(envc, params, args) if params {
+						? -> envc
+						_ -> {
+							if args { ? -> args <- [LispNull] }
+							setv(envc, params.0, args.0)
+							sub(envc, params.1, args.1)
+						}
+					}
+					sub({ '-env': env }, params, args)
+				}
+			), L)
+		}
+		:macro -> {
+			params := L.(1).0
+			body := L.(1).(1).0
+			makeMacro(fn(args) eval(
+				body
+				{
+					fn sub(envc, params, args) if params {
+						? -> envc
+						_ -> {
+							if args { ? -> args <- [LispNull] }
+							setv(envc, params.0, args.0)
+							sub(envc, params.1, args.1)
+						}
+					}
+					sub({ '-env': env }, params, [args, ?])
+				}
+			), L)
+		}
+		:expand -> if expr := eval(L.(1).0, env) {
+			? -> expr
+			_ -> if funcStub := eval(expr.0, env) {
+				[_, _, _] -> if funcStub.0 {
+					true -> eval(funcStub.1, env)(expr.1)
+					_ -> expr
+				}
+				_ -> expr
+			}
+		}
+		_ -> {
+			argcs := L.1
+			funcStub := eval(L.0, env)
+			func := eval(funcStub.1, env)
+
+			// funcStub.0 reports whether the stub is a macro
+			if funcStub.0 {
+				true -> func(argcs) |> eval(env)
+				_ -> {
+					args := [?]
+					argcs |> with reduceSexpr(args) fn(head, x) {
+						cons := [eval(x, env)]
+						head.1 := cons
+						cons
+					}
+					func(args.1)
+				}
+			}
+		}
+	}
+	:atom -> getv(env, L)
+	_ -> L
+}
+
+Env := {
+	'true': true
+	'false': false
+	'car': makeNative(fn(L) L.(0).0)
+	'cdr': makeNative(fn(L) L.(0).1)
+	'car!': makeNative(fn(L) L.(0).0 := L.(1).0)
+	'cdr!': makeNative(fn(L) L.(0).1 := L.(1).0)
+	'cons': makeNative(fn(L) [L.0, L.(1).0])
+	'len': makeNative(fn(L) if type(x := L.0) {
+		:string -> len(x)
+		:atom -> len(string(x))
+		_ -> 0
+	})
+	'gets': makeNative(fn(L) if type(s := L.0) {
+		:string -> slice(
+			s
+			if L.1 != ? -> int(L.(1).0)
+			if L.1 != ? & L.(1).1 != ? -> int(L.(1).(1).0)
+		)
+		_ -> ''
+	})
+	'sets!': makeNative(fn(L) if type(s := L.0) {
+		:string -> {
+			idx := int(L.(1).0)
+			s.(idx) := L.(1).(1).0
+		}
+		_ -> ''
+	})
+
+	// ports of Oak's builtins
+	'char': makeNative(fn(L) char(int(L.0)))
+	'point': makeNative(fn(L) codepoint(L.0))
+	'pow': makeNative(fn(L) pow(L.0, L.(1).0))
+	'sin': makeNative(fn(L) sin(L.0))
+	'cos': makeNative(fn(L) cos(L.0))
+	'tan': makeNative(fn(L) tan(L.0))
+	'int': makeNative(fn(L) int(L.0))
+	'float': makeNative(fn(L) float(L.0))
+	'rand': makeNative(rand)
+	'time': makeNative(time)
+	'args': makeNative(fn(_) {
+		fn makeList(xs) if len(xs) {
+			0 -> ?
+			_ -> [xs.0, makeList(xs |> slice(1))]
+		}
+		makeList(args())
+	})
+
+	// arithmetic and logical operators
+	'=': makeNative(fn(L) L.1 |> reduceSexpr(true, fn(acc, x) acc & L.0 = x))
+	'<': makeNative(fn(L) if L {
+		? -> true
+		_ -> {
+			last := L.0
+			L.1 |> reduceSexpr(true, fn(acc, x) {
+				y := acc & last < x
+				last <- x
+				y
+			})
+		}
+	})
+	'>': makeNative(fn(L) if L {
+		? -> true
+		_ -> {
+			last := L.0
+			L.1 |> reduceSexpr(true, fn(acc, x) {
+				y := acc & last > x
+				last <- x
+				y
+			})
+		}
+	})
+	'+': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a + b))
+	'-': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a - b))
+	'*': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a * b))
+	'/': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a / b))
+	'%': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a % b))
+	'#': makeNative(fn(L) L.1 |> reduceSexpr(L.0, pow))
+
+	// types and conversions
+	'type': makeNative(fn(L) if L.0 {
+		[_, _, _] -> :function
+		[_, _] -> :list
+		_ -> if ty := type(L.0) {
+			:atom -> :symbol
+			_ -> ty
+		}
+	})
+	'string->int': makeNative(fn(L) int(L.0) |> default(0))
+	'string->float': makeNative(fn(L) float(L.0) |> default(0))
+	'string->symbol': makeNative(fn(L) atom(L.0))
+	'->string': makeNative(fn(L) string(L.0))
+
+	// I/O, system
+	'print': makeNative(fn(L) {
+		output := L.1 |> reduceSexpr(
+			if type(L.0) {
+				:string -> L.0
+				_ -> print(L.0)
+			}
+			fn(a, b) a + ' ' + if type(b) {
+				:string -> b
+				_ -> print(b)
+			}
+		)
+		oakPrint(output)
+	})
+}
+
+// we override "print" for the interpreter, but also need to call print.
+// So we alias it to "out".
+out := print
+
+fn print(L) if type(L) {
+	:null -> '()'
+	:empty -> '_'
+	:atom -> string(L)
+	:string -> '\'' << (L |> replace('\\', '\\\\') |> replace('\'', '\\\'')) << '\''
+	:list -> if L {
+		[_, _] -> {
+			fn sub(term, acc) if term {
+				[_, [_, _]] -> sub(term.1, acc << print(term.0))
+				[_, ?] -> acc << print(term.0)
+				[_, _] -> sub(term.1, acc << print(term.0) << '.')
+				_ -> acc << print(term)
+			}
+			'(' << join(sub(L, []), ' ') << ')'
+		}
+		[_, _, _] -> if L.2 {
+			? -> '(function)'
+			_ -> print(L.2)
+		}
+	}
+	_ -> string(L)
+}
+
+fn loadLibs(libs, withEnv) {
+	fn sub(i, env) if i {
+		len(libs) -> withEnv(env)
+		_ -> with fs.readFile(libs.(i)) fn(file) {
+			file |> read() |> eval(env)
+			sub(i + 1, env)
+		}
+	}
+	sub(0, Env |> clone())
+}
+
+fn loadLibSources(libs, withEnv) {
+	fn sub(i, env) if i {
+		len(libs) -> withEnv(env)
+		_ -> {
+			file := libs.(i)
+			file |> read() |> eval(env)
+			sub(i + 1, env)
+		}
+	}
+	sub(0, Env |> clone())
+}
+
+fn loadStdlib(withEnv) loadLibSources([
+	'{{ lib/klisp }}'
+	'{{ lib/str }}'
+	'{{ lib/math }}'
+	'{{ lib/sort }}'
+	'{{ lib/random }}'
+	'{{ lib/test }}'
+], withEnv)
+
+// CLI
+with loadStdlib() fn(env) {
+	lispFileIdx := if idx := args() |> find(fn(arg) arg |> endsWith?('.klisp') | arg |> endsWith?('.lisp')) {
+		-1 -> default(2)
+		_ -> idx
+	}
+	if path := args().(lispFileIdx) {
+		? -> {
+			println('Klisp interpreter v0.1-oak.')
+			fn sub(env) {
+				out('\x1b[0;33mλ\x1b[0;0m ') // ANSI yellow
+				with input() fn(evt) if evt.type != :error -> {
+					evt.data |>
+						read() |>
+						eval(env) |>
+						print() |>
+						println()
+					sub(env)
+				}
+			}
+			sub(env)
+		}
+		_ -> with fs.readFile(path) fn(file) if file {
+			? -> println('error: could not read', path)
+			_ -> file |> read() |> eval(env)
+		}
+	}
+}
+

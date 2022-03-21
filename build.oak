@@ -1,0 +1,45 @@
+// build-and-install script
+
+std := import('std')
+str := import('str')
+fmt := import('fmt')
+fs := import('fs')
+path := import('path')
+
+OakCLI := args().0
+BundlePath := 'amalgamated_klisp.oak'
+InstallPath := '/usr/local/bin/klisp'
+
+fn escapeAsOakString(s) s |> std.map(fn(c) if c {
+	'\'' -> '\\\''
+	_ -> c
+})
+
+with fs.readFile('klisp.oak') fn(klispFile) if klispFile {
+	? -> std.println('Could not read klisp.oak')
+	_ -> with fs.listFiles('./lib') fn(files) if files {
+		? -> std.println('Could not read lib files')
+		_ -> {
+			files := files |> std.filter(fn(f) f.name.0 != '.')
+			libSources := files |> with std.reduce({}) fn(sources, libFile) {
+				libName := 'lib/' + libFile.name |> str.trimEnd('.klisp')
+				// NOTE: assume if library exists, it's still readable here.
+				sources.(libName) := fs.readFile(path.join('lib', libFile.name)) |>
+					escapeAsOakString()
+			}
+			bundledKlispFile := klispFile |> fmt.format(libSources)
+			with fs.writeFile(BundlePath, bundledKlispFile) fn(res) if res {
+				? -> std.println('Could not save amalgamated build')
+				_ -> with exec(
+					OakCLI
+					['pack', '--entry', BundlePath, '--output', InstallPath]
+					''
+				) fn(evt) if {
+					evt.type = :error
+					evt.status != 0 -> fmt.printf('Could not install Klisp:\n{{0}}', evt.stdout)
+					_ -> print(evt.stdout)
+				}
+			}
+		}
+	}
+}
