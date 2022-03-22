@@ -8,15 +8,11 @@ This repo started out as a sort of a (manual, partial) fork of [thesephist/klisp
 
 ## Todos
 
-- Get dot notation working in input/reader
-- Reader macros for quasiquote, unquote with ~ like Clojure?, partial with `[f x ? y]`
-- Finish `lib/str` `lib/json` libraries
-- `if-as` macro
+- Finish `lib/json`
 - File I/O APIs
 - auto-indent in the repl, based on parser errors
 - let\* (or make let polymorphic)
 - docstrings like clojure, defined as strings. Just trim each line.
-- `macroexpand-all` sometimes doesn't expand all: `(macroexpand-all (match (list 1 2 3)))`
 - Maybe I should build utilities to be able to work with knowledge bases in Klisp? Bring back xin notes.
 
 ## Development and build

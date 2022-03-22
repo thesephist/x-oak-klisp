@@ -44,6 +44,20 @@
                 (unless (nil? (unquote (caar terms)))
                   (unquote (cadr terms)))))))
 
+(def if-let
+     (macro (terms)
+            (do
+              (def conddecl (car terms))
+              (def condname (car conddecl))
+              (def if-bodies (cdr terms))
+              (def if-conseq (car if-bodies))
+              (def if-altern (cadr if-bodies))
+              (quasiquote
+                (let (unquote conddecl)
+                  (if (! (nil? (unquote condname)))
+                    (unquote if-conseq)
+                    (unquote if-altern)))))))
+
 (def list
      (macro (items)
             ((def -list
@@ -214,7 +228,9 @@
          (if (list? expr)
            (let (expanded (expand expr))
              (if (list? expanded)
-               (map-list expanded expand-all)
+               (if (= expr expanded)
+                 (map-list expanded expand-all)
+                 (expand-all expanded))
                expanded))
            expr)))
 

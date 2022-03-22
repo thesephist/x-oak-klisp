@@ -206,13 +206,13 @@ fn read(s) {
 LispNull := fn {}
 LispEmpty := fn {}
 
-fn getv(env, name) if v := env.(string(name)) {
+fn getv(env, name, err?) if v := env.(string(name)) {
 	? -> if e := env.'-env' {
 		? -> {
-			println('Unbound name "' + string(name) + '"')
+			if err? -> println('Unbound name "' + string(name) + '"')
 			?
 		}
-		_ -> getv(e, string(name))
+		_ -> getv(e, string(name), err?)
 	}
 	LispNull -> ?
 	LispEmpty -> _
@@ -296,11 +296,15 @@ fn eval(L, env) if type(L) {
 				}
 			), L)
 		}
-		:expand -> if expr := eval(L.(1).0, env) {
-			? -> expr
-			_ -> if funcStub := eval(expr.0, env) {
-				[_, _, _] -> if funcStub.0 {
-					true -> eval(funcStub.1, env)(expr.1)
+		:expand -> {
+			expr := eval(L.(1).0, env)
+			if {
+				expr = ? -> expr
+				type(expr.0) = :atom -> if funcStub := getv(env, expr.0, false) {
+					[_, _, _] -> if funcStub.0 {
+						true -> eval(funcStub.1, env)(expr.1)
+						_ -> expr
+					}
 					_ -> expr
 				}
 				_ -> expr
@@ -326,7 +330,7 @@ fn eval(L, env) if type(L) {
 			}
 		}
 	}
-	:atom -> getv(env, L)
+	:atom -> getv(env, L, true)
 	:string -> clone(L)
 	_ -> L
 }

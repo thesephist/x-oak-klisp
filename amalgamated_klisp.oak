@@ -206,13 +206,13 @@ fn read(s) {
 LispNull := fn {}
 LispEmpty := fn {}
 
-fn getv(env, name) if v := env.(string(name)) {
+fn getv(env, name, err?) if v := env.(string(name)) {
 	? -> if e := env.'-env' {
 		? -> {
-			println('Unbound name "' + string(name) + '"')
+			if err? -> println('Unbound name "' + string(name) + '"')
 			?
 		}
-		_ -> getv(e, string(name))
+		_ -> getv(e, string(name), err?)
 	}
 	LispNull -> ?
 	LispEmpty -> _
@@ -296,11 +296,15 @@ fn eval(L, env) if type(L) {
 				}
 			), L)
 		}
-		:expand -> if expr := eval(L.(1).0, env) {
-			? -> expr
-			_ -> if funcStub := eval(expr.0, env) {
-				[_, _, _] -> if funcStub.0 {
-					true -> eval(funcStub.1, env)(expr.1)
+		:expand -> {
+			expr := eval(L.(1).0, env)
+			if {
+				expr = ? -> expr
+				type(expr.0) = :atom -> if funcStub := getv(env, expr.0, false) {
+					[_, _, _] -> if funcStub.0 {
+						true -> eval(funcStub.1, env)(expr.1)
+						_ -> expr
+					}
 					_ -> expr
 				}
 				_ -> expr
@@ -326,7 +330,7 @@ fn eval(L, env) if type(L) {
 			}
 		}
 	}
-	:atom -> getv(env, L)
+	:atom -> getv(env, L, true)
 	:string -> clone(L)
 	_ -> L
 }
@@ -676,6 +680,20 @@ fn loadStdlib(withEnv) loadLibSources([
                 (unless (nil? (unquote (caar terms)))
                   (unquote (cadr terms)))))))
 
+(def if-let
+     (macro (terms)
+            (do
+              (def conddecl (car terms))
+              (def condname (car conddecl))
+              (def if-bodies (cdr terms))
+              (def if-conseq (car if-bodies))
+              (def if-altern (cadr if-bodies))
+              (quasiquote
+                (let (unquote conddecl)
+                  (if (! (nil? (unquote condname)))
+                    (unquote if-conseq)
+                    (unquote if-altern)))))))
+
 (def list
      (macro (items)
             ((def -list
@@ -846,7 +864,9 @@ fn loadStdlib(withEnv) loadLibSources([
          (if (list? expr)
            (let (expanded (expand expr))
              (if (list? expanded)
-               (map-list expanded expand-all)
+               (if (= expr expanded)
+                 (map-list expanded expand-all)
+                 (expand-all expanded))
                expanded))
            expr)))
 
@@ -1460,6 +1480,7 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn json/parse (s)
       ())
+
 '
 	'; random library, implementing utilities for working
 ; with pseudorandom sources of randomness
