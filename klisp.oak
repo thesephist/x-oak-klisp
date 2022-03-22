@@ -11,6 +11,7 @@
 	map: map
 	find: find
 	reduce: reduce
+	reverse: reverse
 	fromHex: fromHex
 } := import('std')
 {
@@ -23,6 +24,9 @@ fs := import('fs')
 
 // alias print, because it will be overridden later
 oakPrint := print
+
+// Oak list -> Klisp list
+fn listify(xs) xs |> reverse() |> reduce(?, fn(L, x) [x, L])
 
 // like std.reduce, but works on lisp lists
 fn reduceSexpr(L, init, f) {
@@ -441,6 +445,38 @@ Env := {
 			}
 		)
 		oakPrint(output)
+	})
+	'read-file': makeNative(fn(L) if type(path := L.0) {
+		:string -> fs.readFile(path)
+		_ -> ?
+	})
+	'write-file': makeNative(fn(L) if {
+		type(path := L.0) = :string & type(file := L.(1).0) = :string ->
+			fs.writeFile(path, file)
+		_ -> ?
+	})
+	'stat-file': makeNative(fn(L) if type(path := L.0) {
+		:string -> {
+			stat := fs.statFile(path)
+			name := [:name, stat.name]
+			len := [:len, stat.len]
+			mod := [:mod, stat.mod]
+			dir := [:dir, stat.dir]
+			[name, [len, [mod, [dir, ?]]]]
+		}
+		_ -> ?
+	})
+	'list-files': makeNative(fn(L) if type(path := L.0) {
+		:string -> {
+			fs.listFiles(path) |> map(fn(stat) {
+				name := [:name, stat.name]
+				len := [:len, stat.len]
+				mod := [:mod, stat.mod]
+				dir := [:dir, stat.dir]
+				[name, [len, [mod, [dir, ?]]]]
+			}) |> listify()
+		}
+		_ -> ?
 	})
 }
 
