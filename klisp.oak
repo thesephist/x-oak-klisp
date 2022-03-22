@@ -19,7 +19,6 @@
 	trim: trim
 	endsWith?: endsWith?
 } := import('str')
-fmt := import('fmt')
 fs := import('fs')
 
 // alias print, because it will be overridden later
@@ -145,6 +144,7 @@ fn read(s) {
 				? -> acc
 				')' -> {
 					next()
+					forward()
 					acc
 				}
 				'.' -> {
@@ -208,7 +208,10 @@ LispEmpty := fn {}
 
 fn getv(env, name) if v := env.(string(name)) {
 	? -> if e := env.'-env' {
-		? -> ?
+		? -> {
+			println('Unbound name "' + string(name) + '"')
+			?
+		}
 		_ -> getv(e, string(name))
 	}
 	LispNull -> ?
@@ -324,14 +327,15 @@ fn eval(L, env) if type(L) {
 		}
 	}
 	:atom -> getv(env, L)
+	:string -> clone(L)
 	_ -> L
 }
 
 Env := {
 	'true': true
 	'false': false
-	'car': makeNative(fn(L) L.(0).0)
-	'cdr': makeNative(fn(L) L.(0).1)
+	'car': makeNative(fn(L) if L.0 != ? -> L.(0).0)
+	'cdr': makeNative(fn(L) if L.0 != ? -> L.(0).1)
 	'car!': makeNative(fn(L) L.(0).0 := L.(1).0)
 	'cdr!': makeNative(fn(L) L.(0).1 := L.(1).0)
 	'cons': makeNative(fn(L) [L.0, L.(1).0])
@@ -358,8 +362,7 @@ Env := {
 
 	// ports of Oak's builtins
 	'char': makeNative(fn(L) char(int(L.0)))
-	'point': makeNative(fn(L) codepoint(L.0))
-	'pow': makeNative(fn(L) pow(L.0, L.(1).0))
+	'codepoint': makeNative(fn(L) codepoint(L.0))
 	'sin': makeNative(fn(L) sin(L.0))
 	'cos': makeNative(fn(L) cos(L.0))
 	'tan': makeNative(fn(L) tan(L.0))
@@ -411,6 +414,7 @@ Env := {
 		[_, _, _] -> :function
 		[_, _] -> :list
 		_ -> if ty := type(L.0) {
+			:null -> :nil
 			:atom -> :symbol
 			_ -> ty
 		}
@@ -492,10 +496,14 @@ fn loadStdlib(withEnv) loadLibSources([
 	//
 	// In the Ink-based Klisp CLI, this loading of libraries is asynchronous.
 	'{{ lib/klisp }}'
+	'{{ lib/macro }}'
+	'{{ lib/iter }}'
 	'{{ lib/str }}'
 	'{{ lib/math }}'
 	'{{ lib/sort }}'
+	'{{ lib/json }}'
 	'{{ lib/random }}'
+	'{{ lib/comp }}'
 	'{{ lib/test }}'
 ], withEnv)
 
@@ -509,7 +517,7 @@ with loadStdlib() fn(env) {
 		? -> {
 			println('Klisp interpreter v0.1-oak.')
 			fn sub(env) {
-				out('\x1b[0;33mλ\x1b[0;0m ') // ANSI yellow
+				out('λ ')
 				with input() fn(evt) if evt.type != :error -> {
 					evt.data |>
 						read() |>
