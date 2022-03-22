@@ -30,9 +30,10 @@ syntax keyword klispKeyword if contained
 syntax keyword klispKeyword fn contained
 syntax keyword klispKeyword macro contained
 " language builtin forms
-syntax match klispKeywordCadrContainer "\vc[ad]r!?\W" contains=klispKeywordCadr
-syntax match klispKeywordCadr "\vc[ad]r!?" contained
+syntax match klispKeywordCadrContainer "\v(car|cdr|first|rest)!?[ ()$]" contains=klispKeywordCadr
+syntax match klispKeywordCadr "\v(car|cdr|first|rest)!?" contained
 syntax keyword klispKeyword cons contained
+syntax keyword klispKeyword conj contained
 " core library and control flow forms
 syntax keyword klispKeyword let contained
 syntax keyword klispKeyword when contained
@@ -45,7 +46,7 @@ syntax keyword klispKeyword match contained
 syntax keyword klispKeyword quasiquote contained
 syntax keyword klispKeyword unquote contained
 " type assertions
-syntax match klispKeywordTyContainer "\v\-\>(nil|int|float|number|bool|string|symbol|function|list)\??\W" contains=klispKeywordTy
+syntax match klispKeywordTyContainer "\v\(\s*(nil|int|float|number|bool|\-\>string|symbol|function|list)\??[ ()$]" contains=klispKeywordTy
 syntax match klispKeywordTy "\vnil\?" contained
 syntax match klispKeywordTy "\vint\??" contained
 syntax match klispKeywordTy "\vfloat\??" contained
@@ -60,9 +61,9 @@ highlight link klispKeywordCadr Keyword
 highlight link klispKeywordTy Keyword
 
 " functions
-syntax match klispFunctionForm "\v\(\s*[A-Za-z0-9\-?!+*/:><=%&|]+" contains=klispFunctionName,klispKeyword,klispKeywordCadr,klispKeywordTy
-syntax match klispFunctionForm "\v\(\s*defn\s+[A-Za-z0-9\-?!+*/:><=%&|]+" contains=klispFunctionName,klispKeyword,klispKeywordCadr,klispKeywordTy
-syntax match klispFunctionName "\v[A-Za-z0-9\-?!+*/:><=%&|]+" contained contains=klispKeyword,klispKeywordCadr,klispKeywordTy
+syntax match klispFunctionForm "\v\(\s*[A-Za-z0-9\-?!+*/:><=%&|]+" contains=klispFunctionName,klispKeywordTyContainer
+syntax match klispFunctionForm "\v\(\s*defn\s+[A-Za-z0-9\-?!+*/:><=%&|]+" contains=klispFunctionName
+syntax match klispFunctionName "\v[A-Za-z0-9\-?!+*/:><=%&|]+" contained contains=klispKeyword,klispKeywordCadrContainer
 highlight link klispFunctionName Function
 
 " strings
