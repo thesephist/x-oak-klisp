@@ -1,0 +1,228 @@
+; iterator and sequence functions
+
+(defn base-iterator (seq)
+      (if (list? seq) () ''))
+
+(defn empty? (seq)
+      (= seq (base-iterator seq)))
+
+(defn first (seq)
+      (if (list? seq)
+        (car seq)
+        (gets seq 0 1)))
+
+(defn first! (seq x)
+      (if (list? seq)
+        (car! seq x)
+        (sets! seq 0 x)))
+
+(defn rest (seq)
+      (if (list? seq)
+        (cdr seq)
+        (gets seq 1)))
+
+(defn rest! (seq xs)
+      (if (list? seq)
+        (cdr! seq xs)
+        (sets! seq 1 xs)))
+
+(defn conj (x seq)
+      (if (list? seq)
+        (cons x seq)
+        (+ x seq)))
+
+; generic iterator implementations
+
+(defn nth (xs i)
+      (if (zero? i)
+        (first xs)
+        (nth (rest xs) (dec i))))
+
+(defn nth! (xs i x)
+      (if (zero? i)
+        (first! xs x)
+        (nth! (rest xs) (dec i) x)))
+
+(defn second (xs)
+      (nth xs 2))
+
+(defn last (xs)
+      (if (empty? xs)
+        xs
+        (if (empty? (rest xs))
+          (first xs)
+          (last (rest xs)))))
+
+(defn index (xs x)
+      (do
+        (defn index-from (xs x i)
+              (if (empty? xs)
+                -1
+                (if (= (first xs) x)
+                  i
+                  (index-from (rest xs) x (inc i)))))
+        (index-from xs x 0)))
+
+(defn contains? (xs x)
+      (<= 0 (index xs x)))
+
+(defn find (xs f?)
+      (do
+        (defn find-from (xs f? i)
+              (if (empty? xs)
+                -1
+                (if (f? (first xs))
+                  i
+                  (find-from (rest xs) f? (inc i)))))
+        (find-from xs f? 0)))
+
+(defn some? (xs f?)
+      (do
+        (default f? id)
+        (if (empty? xs)
+          false
+          (if (f? (first xs))
+            true
+            (some (rest xs) f?)))))
+
+(defn every? (xs f?)
+      (do
+        (default f? id)
+        (if (empty? xs)
+          true
+          (if (f? (first xs))
+            (every? (rest xs) f?)
+            false))))
+
+(defn append (xs ys)
+      (if (empty? xs)
+        ys
+        (conj (first xs)
+              (append (rest xs) ys))))
+
+(defn reverse (xs)
+      (do
+        (defn -reverse (acc xs)
+              (if (empty? xs)
+                acc
+                (-reverse (conj (first xs)
+                                acc)
+                          (rest xs))))
+        (-reverse (base-iterator xs) xs)))
+
+(defn map (xs f)
+      (if (empty? xs)
+        xs
+        (conj (f (first xs))
+              (map (rest xs) f))))
+
+(defn reduce (xs acc f)
+      (if (empty? xs)
+        acc
+        (reduce (rest xs)
+                (f acc (first xs))
+                f)))
+
+(defn filter (xs f?)
+      (if (empty? xs)
+        xs
+        (if (f? (first xs))
+          (conj (first xs)
+                (filter (rest xs) f?))
+          (filter (rest xs) f?))))
+
+(defn exclude (xs f?)
+      (if (empty? xs)
+        xs
+        (if (f? (first xs))
+          (exclude (rest xs) f?)
+          (conj (first xs)
+                (exclude (rest xs) f?)))))
+
+(defn each (xs f)
+      (unless (empty? xs)
+        (do
+          (f (first xs))
+          (each (rest xs) f))))
+
+(defn size (xs)
+      (if (list? xs)
+        (reduce xs 0 inc)
+        (len xs)))
+
+(defn zip (xs ys f)
+      (do
+        (default f (if (list? xs) list +))
+        (if (| (empty? xs) (empty? ys))
+          ()
+          (cons (f (first xs) (first ys))
+                (zip (rest xs) (rest ys) f)))))
+
+(defn take (xs n)
+      (if (| (empty? xs) (zero? n))
+        (base-iterator xs)
+        (conj (first xs)
+              (take (rest xs) (dec n)))))
+
+(defn take-while (xs f?)
+      (if (empty? xs)
+        xs
+        (if (f? (first xs))
+          (conj (first xs)
+                (take-while (rest xs) f?))
+          (base-iterator xs))))
+
+(defn drop (xs n)
+      (if (| (empty? xs) (zero? n))
+        xs
+        (drop (rest xs) (dec n))))
+
+(defn drop-while (xs f?)
+      (if (empty? xs)
+        xs
+        (if (f? (first xs))
+          (drop-while (rest xs) f?)
+          xs)))
+
+(defn slice (xs start end)
+      (do
+        (default start 0)
+        (default end (size xs))
+        (-> xs
+            (drop start)
+            (take (- end start)))))
+
+(defn flatten (xs)
+      (reduce xs () append))
+
+(defn partition (xs by)
+      (match (type by)
+             (,nil (partition xs id))
+             (,int (do
+                     (defn -partition (xs n)
+                           (let (tail (drop xs n))
+                             (if (empty? tail)
+                               (list xs)
+                               (conj (take xs n)
+                                     (-partition tail n)))))
+                     (-partition xs (if (< by 1) 1 by))))
+             (,function (do
+                          (defn cut-by (xs f)
+                                (if (empty? xs)
+                                  (list () ())
+                                  (let (first-half (conj (first xs)
+                                                         (take-while (rest xs)
+                                                                     (is (f (first xs))))))
+                                    (list first-half
+                                          (drop xs (size first-half))))))
+                          (defn -partition (xs f)
+                                (if (empty? xs)
+                                  xs
+                                  (do
+                                    (def cut (cut-by xs f))
+                                    (def first-half (car cut))
+                                    (def rest-half (cadr cut))
+                                    (conj first-half
+                                          (-partition rest-half f)))))
+                          (-partition xs by)))))
+

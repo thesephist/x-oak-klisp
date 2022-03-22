@@ -1,0 +1,253 @@
+; core macros
+
+(def gensym
+     (fn ()
+         (-> (rand)
+             (* 100000000)
+             int
+             ->string
+             ((fn (s) (+ 'sym' s)))
+             string->symbol)))
+
+; used for basic macros, not external
+(def map-list
+     (fn (xs f)
+         (if (nil? xs)
+           ()
+           (cons (f (car xs))
+                 (map-list (cdr xs) f)))))
+
+; macros
+(def when
+     (macro (terms)
+            (list ,if (car terms) (cadr terms) ())))
+
+(def unless
+     (macro (terms)
+            (list ,if (car terms) () (cadr terms))))
+
+(def let
+     (macro (terms)
+            (do
+              (def decl (car terms))
+              (def declname (car decl))
+              (def declval (cadr decl))
+              (def body (cadr terms))
+              (list
+                (list ,fn (list declname) body)
+                declval))))
+
+(def when-let
+     (macro (terms)
+            (quasiquote
+              (let (unquote (car terms))
+                (unless (nil? (unquote (caar terms)))
+                  (unquote (cadr terms)))))))
+
+(def list
+     (macro (items)
+            ((def -list
+                  (fn (items)
+                      (if (nil? items)
+                        ()
+                        (cons ,cons
+                              (cons (car items)
+                                    (cons (-list (cdr items))
+                                          ()))))))
+             items)))
+
+(def quasiquote
+     (macro (terms)
+            (cons
+              ,list
+              (map-list (car terms)
+                        (fn (term)
+                            (if (list? term)
+                              (if (= ,unquote (car term))
+                                (cadr term)
+                                (list ,quasiquote term))
+                              (list ,quote term)))))))
+
+(def do-times
+     (macro (terms)
+            (cons ,do
+                  (list-of (car terms) (list (cadr terms))))))
+
+(def list-of
+     (macro (terms)
+            (let (n (car terms))
+              (let (f (cadr terms))
+                (quasiquote
+                  (-> (range (unquote n))
+                      (map-list (fn () (unquote f)))))))))
+
+; (default name value)
+(def default
+     (macro (terms)
+            (do
+              (def name (car terms))
+              (def val (cadr terms))
+              (quasiquote
+                (if (= (unquote name) ())
+                  (def (unquote name) (unquote val))
+                  ())))))
+
+; (while condition . body)
+(def while
+     (macro (terms)
+            (do
+              (def cndn (car terms))
+              (def body (cdr terms))
+              (def -while-f (gensym))
+              (quasiquote
+                ((def (unquote -while-f)
+                      (fn ()
+                          (if (unquote cndn)
+                            (do
+                              (unquote (cons ,do body))
+                              ((unquote -while-f)))
+                            ()))))))))
+
+(def defn
+     (macro (terms)
+            (quasiquote
+              (def (unquote (car terms))
+                   (fn (unquote (cadr terms))
+                       (unquote (car (cddr terms))))))))
+
+(def defmacro
+     (macro (terms)
+            (quasiquote
+              (def (unquote (car terms))
+                   (macro (unquote (cadr terms))
+                          (unquote (car (cddr terms))))))))
+
+; (cond (pred body) (pred body) (default-body))
+(def cond
+     (macro (terms)
+            ((def -cond
+                  (fn (terms)
+                      (if (nil? terms)
+                        ()
+                        (if (nil? (cdar terms))
+                          (caar terms)
+                          (quasiquote
+                            (if (unquote (car (car terms)))
+                              (unquote (cadr (car terms)))
+                              (unquote (-cond (cdr terms)))))))))
+             terms)))
+
+; (match val (tag body) (tag body) (default-body))
+(def match
+     (macro (terms)
+            (do
+              (def -match-val (gensym))
+              (def -match
+                   (fn (terms)
+                       (if (nil? terms)
+                         ()
+                         (if (nil? (cdar terms))
+                           (caar terms)
+                           (quasiquote
+                             (if (= (unquote -match-val) (unquote (car (car terms))))
+                               (unquote (cadr (car terms)))
+                               (unquote (-match (cdr terms)))))))))
+              (quasiquote
+                (let ((unquote -match-val) (unquote (car terms)))
+                  (unquote (-match (cdr terms))))))))
+
+; thread-first
+(def ->
+     (macro (terms)
+            (do
+              (def apply-partials
+                   (fn (partials expr)
+                       (if (nil? partials)
+                         expr
+                         (if (symbol? (car partials))
+                           (list (car partials)
+                                 (apply-partials (cdr partials) expr))
+                           (cons (caar partials)
+                                 (cons (apply-partials (cdr partials) expr)
+                                       (cdar partials)))))))
+              (apply-partials (reverse (cdr terms))
+                              (car terms)))))
+
+; thread-last
+(def ->>
+     (macro (terms)
+            (do
+              (def apply-partials
+                   (fn (partials expr)
+                       (if (nil? partials)
+                         expr
+                         (if (symbol? (car partials))
+                           (list (car partials)
+                                 (apply-partials (cdr partials) expr))
+                           (<< (car partials)
+                               (apply-partials (cdr partials) expr))))))
+              (apply-partials (reverse (cdr terms))
+                              (car terms)))))
+
+; partial application
+(def partial
+     (macro (terms)
+            (let (partial-arg (gensym))
+              (list ,fn
+                    (list partial-arg)
+                    (do
+                      (defn -replace-partial-arg (expr)
+                            (if (list? expr)
+                              (map-list expr -replace-partial-arg)
+                              (if (= expr ,?)
+                                partial-arg
+                                expr)))
+                      (-replace-partial-arg (car terms)))))))
+
+; macro expansion functions and macros
+(def macroexpand
+     (macro (terms)
+            (quasiquote (expand (quote (unquote (car terms)))))))
+
+(def expand-all
+     (fn (expr)
+         (if (list? expr)
+           (let (expanded (expand expr))
+             (if (list? expanded)
+               (map-list expanded expand-all)
+               expanded))
+           expr)))
+
+(def macroexpand-all
+     (macro (terms)
+            (quasiquote (expand-all (quote (unquote (car terms)))))))
+
+; utilities
+(def println
+     (macro (terms)
+            ; we expand the macro manually here
+            ; because println should be as fast as possible
+            (cons ,do
+                  (cons (cons ,print terms)
+                        (cons ,(print (char 10))
+                              ())))))
+
+(def comment
+     ; add "(comment val)" to an expr head
+     ; to substitute the expr with "val"
+     (macro (terms) (car terms)))
+
+(def log-runtime
+     ; prints runtime (finish - start) of an expression
+     ; usage: (log-runtime 'label' (do something))
+     (macro (terms)
+            (let (-val (gensym))
+              (quasiquote
+                (do
+                  (def start (time))
+                  (def (unquote -val) (unquote (cadr terms)))
+                  (println (+ 'Runtime for ' (unquote (car terms)) ':')
+                           (->string (* 1000 (- (time) start)))
+                           'ms')
+                  (unquote -val))))))
+

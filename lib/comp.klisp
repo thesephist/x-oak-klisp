@@ -1,0 +1,51 @@
+; composites: persistent immutable associative array
+
+; comps store key-value pairs in a list as
+; ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
+; Each entry is a single cons cell rather than a list to make value lookup a bit
+; more efficient.
+(defmacro comp (terms)
+  (do
+    (def -comp
+         (fn (items)
+             (if (nil? items)
+               ()
+               (list ,cons
+                     (list ,cons (car items) (cadr items))
+                     (-comp (cddr items))))))
+    (-comp terms)))
+
+; recursive value lookup by key
+(defn getc (cp k v)
+      (if (nil? cp)
+        v
+        (if (= k (caar cp))
+          (cdar cp)
+          (getc (cdr cp) k v))))
+
+; comps are immutable, and new values are set by adding new entries
+; to the head of the comp's underlying list. setc does not modify the
+; given comp and returns a new comp with the new key, value set.
+(defn setc (cp k v)
+      (cons (cons k v)
+            (exclude cp
+                     (partial ((is k) (car ?))))))
+
+; get just the comp keys
+(defn keys (cp)
+      (map cp car))
+
+; get just the comp values
+(defn values (cp)
+      (map cp cdr))
+
+; functions with comps
+
+(defn freq (xs)
+      (reduce xs
+              (comp)
+              (fn (counts x)
+                  (setc counts
+                        x
+                        (inc (getc counts x 0))))))
+

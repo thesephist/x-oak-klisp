@@ -8,8 +8,5 @@
 
 (-> (nat 20)
 	(each (fn (n)
-			  (println 'Fib of'
-					   n
-					   'is'
-					   (fib n)))))
+			  (println 'Fib of' n 'is' (fib n)))))
 

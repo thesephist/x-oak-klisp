@@ -53,7 +53,7 @@
 ; naive factorize
 (defn factors (n)
       (let (first-half (-> (nat (int (sqrt n)))
-                           (filter (partial (factor? n _)))))
+                           (filter (partial (factor? n ?)))))
         (cond
           ((nil? first-half) first-half)
           ((nil? (cdr first-half)) first-half)
@@ -62,16 +62,36 @@
                   (let (rev-first-half (reverse first-half))
                     (if (= (car rev-first-half)
                            (/ n (car rev-first-half)))
-                      (cdr (map rev-first-half (partial (/ n _))))
-                      (map rev-first-half (partial (/ n _))))))))))
+                      (cdr (map rev-first-half (partial (/ n ?))))
+                      (map rev-first-half (partial (/ n ?))))))))))
 
-(defn randi (max)
-      (int (* (rand) max)))
+(def sum
+     (fn (ns) (reduce ns 0 +)))
+
+(def prod
+     (fn (ns) (reduce ns 1 *)))
 
 (defn mean (xs)
       (/ (sum xs) (size xs)))
-(def avg mean)
 
 (defn geomean (xs)
       (# (prod xs) (/ 1 (size xs))))
+
+(def min
+     (fn (xs)
+         (if (nil? xs)
+           ()
+           (reduce xs
+                   (car xs)
+                   (fn (a b)
+                       (if (< a b) a b))))))
+
+(def max
+     (fn (xs)
+         (if (nil? xs)
+           ()
+           (reduce xs
+                   (car xs)
+                   (fn (a b)
+                       (if (< a b) b a))))))
 
