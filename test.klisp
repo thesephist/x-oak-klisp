@@ -2,9 +2,78 @@
 
 (run-tests
   (test 'basic addition'
-		4
-		(+ 2 2))
+        4
+        (+ 2 2))
   (test 'basic subtraction'
-		5
-		(- 10 5)))
+        5
+        (- 10 5))
+
+  (test 'base-iterator list'
+        ()
+        (base-iterator (list 1 2 3)))
+  (test 'base-iterator string'
+        ''
+        (base-iterator 'hello'))
+
+  (test 'first empty list'
+        ()
+        (first ()))
+  (test 'first list'
+        10
+        (first (list 10 20 30)))
+  (test 'first empty string'
+        ''
+        (first ''))
+  (test 'first string'
+        'L'
+        (first 'Lisp'))
+
+  (test 'rest empty list'
+        ()
+        (rest ()))
+  (test 'rest list'
+        (list 20 30)
+        (rest (list 10 20 30)))
+  (test 'rest empty string'
+        ''
+        (rest ''))
+  (test 'rest string'
+        'isp'
+        (rest 'Lisp'))
+
+  (test 'conj onto string'
+        'Lisp'
+        (conj 'L' 'isp'))
+  (test 'conj onto list'
+        (list 10 20 30 40)
+        (conj 10 (list 20 30 40)))
+
+  (test 'nth of string'
+        'p'
+        (nth 'Apple' 2))
+  (test 'nth of string, too low'
+        ''
+        (nth 'Apple' -2))
+  (test 'nth of string, too high'
+        ''
+        (nth 'Apple' 10))
+  (test 'nth of list'
+        3
+        (nth (nat 5) 2))
+  (test 'nth of list, too low'
+        ()
+        (nth (nat 5) -2))
+  (test 'nth of list, too high'
+        ()
+        (nth (nat 5) 10))
+
+  (test 'nth! of string'
+        'ApXle'
+        (let (s 'Apple')
+          (do
+            (nth! s 2 'X')
+            s)))
+  ; TODO: finish this section
+
+  )
 

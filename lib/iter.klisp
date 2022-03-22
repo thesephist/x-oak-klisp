@@ -34,14 +34,18 @@
 ; generic iterator implementations
 
 (defn nth (xs i)
-      (if (zero? i)
-        (first xs)
-        (nth (rest xs) (dec i))))
+	  (if (not-pos? i)
+		(if (zero? i)
+		  (first xs)
+		  (base-iterator xs))
+		(nth (rest xs) (dec i))))
 
 (defn nth! (xs i x)
-      (if (zero? i)
-        (first! xs x)
-        (nth! (rest xs) (dec i) x)))
+	  (if (list? xs)
+		(if (not-pos? i)
+		  (first! xs x)
+		  (nth! (rest xs) (dec i) x))
+		(sets! xs i (char-at x 0))))
 
 (defn second (xs)
       (nth xs 2))
