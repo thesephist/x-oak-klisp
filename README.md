@@ -106,7 +106,6 @@ Lastly, there are a handful of built-in functions that let Klisp programs intera
 ## Todos
 
 - Finish `lib/json` for JSON parsing and serialization. Can model off of [Oak's libjson](https://oaklang.org/lib/json/).
-- Auto-indent in the repl if input is not complete
 - Maybe I should build utilities to be able to work with knowledge bases in Klisp? Bring back Xin notes?
 
 ## Development and build

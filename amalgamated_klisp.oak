@@ -93,21 +93,24 @@ fn read(s) {
 		forward: forward
 	} := r
 
-	// forward through possible comments at start
+	// forward through possible space & comments at start
 	forward()
 
 	fn parse() if c := peek() {
-		? -> ? // eof
-		')' -> ? // halt parsing
+		? -> { error: 'EOF' }
+		')' -> { error: 'Unexpected )' }
 		',' -> {
 			next()
 			forward()
-			[:quote, [parse(), ?]]
+			if type(result := parse()) {
+				:object -> result
+				_ -> [:quote, [result, ?]]
+			}
 		}
 		'\'' -> {
 			next()
 			fn sub(acc) if peek() {
-				? -> acc
+				? -> { error: 'EOF' }
 				'\\' -> {
 					next()
 					sub(
@@ -145,7 +148,7 @@ fn read(s) {
 			next()
 			forward()
 			fn sub(acc, tail) if peek() {
-				? -> acc
+				? -> { error: 'EOF' }
 				')' -> {
 					next()
 					forward()
@@ -154,28 +157,36 @@ fn read(s) {
 				'.' -> {
 					next()
 					forward()
-					cons := parse()
-					forward()
-					acc := if acc {
-						? -> cons
+					if type(result := parse()) {
+						:object -> result
 						_ -> {
-							tail.1 := cons
-							acc
+							cons := result
+							forward()
+							acc := if acc {
+								? -> cons
+								_ -> {
+									tail.1 := cons
+									acc
+								}
+							}
+							sub(acc, cons)
 						}
 					}
-					sub(acc, cons)
 				}
-				_ -> {
-					cons := [parse(), ?]
-					forward()
-					acc := if acc {
-						? -> cons
-						_ -> {
-							tail.1 := cons
-							acc
+				_ -> if type(result := parse()) {
+					:object -> result
+					_ -> {
+						cons := [result, ?]
+						forward()
+						acc := if acc {
+							? -> cons
+							_ -> {
+								tail.1 := cons
+								acc
+							}
 						}
+						sub(acc, cons)
 					}
-					sub(acc, cons)
 				}
 			}
 			sub(?, ?)
@@ -192,18 +203,35 @@ fn read(s) {
 		}
 	}
 
-	term := [parse(), ?]
-	prog := [:do, term]
-	fn sub(tail) if peek() {
-		?, ')' -> prog
+	if type(result := parse()) {
+		:object -> result
 		_ -> {
-			term := [parse(), ?]
-			tail.1 := term
+			term := [result, ?]
+			prog := [:do, term]
 			forward()
+			fn sub(tail) if peek() {
+				? -> prog
+				_ -> if type(result := parse()) {
+					:object -> result
+					_ -> {
+						term := [result, ?]
+						tail.1 := term
+						forward()
+						sub(term)
+					}
+				}
+			}
 			sub(term)
 		}
 	}
-	sub(term)
+}
+
+fn must(result) if type(result) {
+	:object -> {
+		println(result.error)
+		exit(1)
+	}
+	_ -> result
 }
 
 // globally unique sentinel values
@@ -490,10 +518,6 @@ Env := {
 	})
 }
 
-// we override "print" for the interpreter, but also need to call print.
-// So we alias it to "out".
-out := print
-
 fn print(L) if type(L) {
 	:null -> '()'
 	:empty -> '_'
@@ -521,7 +545,7 @@ fn loadLibs(libs, withEnv) {
 	fn sub(i, env) if i {
 		len(libs) -> withEnv(env)
 		_ -> with fs.readFile(libs.(i)) fn(file) {
-			file |> read() |> eval(env)
+			file |> read() |> must() |> eval(env)
 			sub(i + 1, env)
 		}
 	}
@@ -533,7 +557,7 @@ fn loadLibSources(libs, withEnv) {
 		len(libs) -> withEnv(env)
 		_ -> {
 			file := libs.(i)
-			file |> read() |> eval(env)
+			file |> read() |> must() |> eval(env)
 			sub(i + 1, env)
 		}
 	}
@@ -1758,18 +1782,27 @@ with loadStdlib() fn(env) {
 	if path := args().(lispFileIdx) {
 		? -> {
 			println('Klisp interpreter v0.1-oak.')
-			fn sub(env) {
-				out('λ ')
+			incomplete := ''
+			fn sub {
+				if incomplete {
+					'' -> 'λ '
+					_ -> '  '
+				} |> oakPrint()
 				with input() fn(evt) if evt.type != :error -> {
-					evt.data |>
-						read() |>
-						eval(env) |>
-						print() |>
-						println()
-					sub(env)
+					if type(result := read(incomplete + evt.data)) {
+						:object -> if result.error {
+							'EOF' -> incomplete << evt.data << '\n'
+							_ -> println('Syntax error:', result.error)
+						}
+						_ -> {
+							result |> eval(env) |> print() |> println()
+							incomplete <- ''
+						}
+					}
+					sub()
 				}
 			}
-			sub(env)
+			sub()
 		}
 		_ -> with fs.readFile(path) fn(file) if file {
 			? -> println('error: could not read', path)
