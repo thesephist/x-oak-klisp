@@ -93,9 +93,6 @@ fn read(s) {
 		forward: forward
 	} := r
 
-	// forward through possible space & comments at start
-	forward()
-
 	fn parse() if c := peek() {
 		? -> { error: 'EOF' }
 		')' -> { error: 'Unexpected )' }
@@ -203,25 +200,31 @@ fn read(s) {
 		}
 	}
 
-	if type(result := parse()) {
-		:object -> result
-		_ -> {
-			term := [result, ?]
-			prog := [:do, term]
-			forward()
-			fn sub(tail) if peek() {
-				? -> prog
-				_ -> if type(result := parse()) {
-					:object -> result
-					_ -> {
-						term := [result, ?]
-						tail.1 := term
-						forward()
-						sub(term)
+	// forward through possible space & comments at start
+	forward()
+
+	// if input is empty or comment-only, just eval to ()
+	if peek() != ? -> {
+		if type(result := parse()) {
+			:object -> result
+			_ -> {
+				term := [result, ?]
+				prog := [:do, term]
+				forward()
+				fn sub(tail) if peek() {
+					? -> prog
+					_ -> if type(result := parse()) {
+						:object -> result
+						_ -> {
+							term := [result, ?]
+							tail.1 := term
+							forward()
+							sub(term)
+						}
 					}
 				}
+				sub(term)
 			}
-			sub(term)
 		}
 	}
 }
@@ -1773,6 +1776,8 @@ fn loadStdlib(withEnv) loadLibSources([
 '
 ], withEnv)
 
+println(read('; hi'))
+
 // CLI
 with loadStdlib() fn(env) {
 	lispFileIdx := if idx := args() |> find(fn(arg) arg |> endsWith?('.klisp') | arg |> endsWith?('.lisp')) {
@@ -1789,14 +1794,18 @@ with loadStdlib() fn(env) {
 					_ -> '  '
 				} |> oakPrint()
 				with input() fn(evt) if evt.type != :error -> {
-					if type(result := read(incomplete + evt.data)) {
-						:object -> if result.error {
-							'EOF' -> incomplete << evt.data << '\n'
-							_ -> println('Syntax error:', result.error)
-						}
-						_ -> {
-							result |> eval(env) |> print() |> println()
-							incomplete <- ''
+					if evt.data |> trim() {
+						'' -> ?
+						';abort', '; abort' -> incomplete <- ''
+						_ -> if type(result := read(incomplete + evt.data)) {
+							:object -> if result.error {
+								'EOF' -> incomplete << evt.data << '\n'
+								_ -> println('Syntax error:', result.error)
+							}
+							_ -> {
+								result |> eval(env) |> print() |> println()
+								incomplete <- ''
+							}
 						}
 					}
 					sub()
