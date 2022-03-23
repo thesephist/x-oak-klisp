@@ -11,6 +11,7 @@ BundlePath := 'amalgamated_klisp.oak'
 InstallPath := '/usr/local/bin/klisp'
 
 fn escapeAsOakString(s) s |> std.map(fn(c) if c {
+	'\\' -> '\\\\'
 	'\'' -> '\\\''
 	_ -> c
 })
