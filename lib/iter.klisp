@@ -34,18 +34,18 @@
 ; generic iterator implementations
 
 (defn nth (xs i)
-	  (if (not-pos? i)
-		(if (zero? i)
-		  (first xs)
-		  (base-iterator xs))
-		(nth (rest xs) (dec i))))
+      (if (not-pos? i)
+        (if (zero? i)
+          (first xs)
+          (base-iterator xs))
+        (nth (rest xs) (dec i))))
 
 (defn nth! (xs i x)
-	  (if (list? xs)
-		(if (not-pos? i)
-		  (first! xs x)
-		  (nth! (rest xs) (dec i) x))
-		(sets! xs i (char-at x 0))))
+      (if (list? xs)
+        (if (not-pos? i)
+          (first! xs x)
+          (nth! (rest xs) (dec i) x))
+        (sets! xs i (char-at x 0))))
 
 (defn second (xs)
       (nth xs 2))
@@ -199,6 +199,9 @@
 (defn flatten (xs)
       (reduce xs () append))
 
+(defn compact (xs)
+      (exclude xs (is ())))
+
 (defn partition (xs by)
       (match (type by)
              (,nil (partition xs id))
@@ -216,7 +219,8 @@
                                   (list () ())
                                   (let (first-half (conj (first xs)
                                                          (take-while (rest xs)
-                                                                     (is (f (first xs))))))
+                                                                     (let (f-of-first (f (first xs)))
+                                                                       (fn (x) (= (f x) f-of-first))))))
                                     (list first-half
                                           (drop xs (size first-half))))))
                           (defn -partition (xs f)
@@ -229,4 +233,8 @@
                                     (conj first-half
                                           (-partition rest-half f)))))
                           (-partition xs by)))))
+
+(defn uniq (xs by)
+      (-> (partition xs by)
+          (map first)))
 

@@ -1,194 +1,198 @@
 ; string library, modeled after oak/libstr
 
 (defn char-at (s i)
-	  (gets s i (inc i)))
+      (gets s i (inc i)))
 
 (defn char-between? (c start end)
-	  (& (<= start c) (<= c end)))
+      (& (<= start c) (<= c end)))
 
 (defn upper? (c)
-	  (char-between? c 'A' 'Z'))
+      (char-between? c 'A' 'Z'))
 
 (defn lower? (c)
-	  (char-between? c 'a' 'z'))
+      (char-between? c 'a' 'z'))
 
 (defn digit? (c)
-	  (char-between? c '0' '9'))
+      (char-between? c '0' '9'))
 
 (defn space? (c)
-	  (| (= c ' ')
-		 (= c '\t')
-		 (= c '\n')
-		 (= c '\r')
-		 (= c '\f')))
+      (| (= c ' ')
+         (= c '\t')
+         (= c '\n')
+         (= c '\r')
+         (= c '\f')))
 
 (defn letter? (c)
-	  (| (upper? c) (lower? c)))
+      (| (upper? c) (lower? c)))
 
 (defn word? (c)
-	  (| (letter? c) (digit? c)))
+      (| (letter? c) (digit? c)))
 
 (defn join (strings joiner)
-	  (do
-		(default joiner '')
-		(if (nil? strings)
-		  ''
-		  (do
-			(defn -join (acc strings)
-				  (if (nil? strings)
-					acc
-					(-join (+ acc joiner (car strings))
-						   (cdr strings))))
-			(-join (car strings) (cdr strings))))))
+      (do
+        (default joiner '')
+        (if (nil? strings)
+          ''
+          (do
+            (defn -join (acc strings)
+                  (if (nil? strings)
+                    acc
+                    (-join (+ acc joiner (car strings))
+                           (cdr strings))))
+            (-join (car strings) (cdr strings))))))
 
 (defn starts-with? (s prefix)
-	  (= (gets s 0 (len prefix))
-		 prefix))
+      (= (gets s 0 (len prefix))
+         prefix))
 
 (defn ends-with? (s suffix)
-	  (= (gets s (- (len s) (len prefix)))
-		 suffix))
+      (= (gets s (- (len s) (len prefix)))
+         suffix))
 
 (defn str-index (s substr)
-	  (do
-		(defn -iter (i)
-			  (if (<= (len s) i)
-				-1
-				(if (= (gets s i (+ i (len substr))) substr)
-				  i
-				  (-iter (inc i)))))
-		(-iter 0)))
+      (do
+        (defn -iter (i)
+              (if (<= (len s) i)
+                -1
+                (if (= (gets s i (+ i (len substr))) substr)
+                  i
+                  (-iter (inc i)))))
+        (-iter 0)))
 
 (defn str-contains? (s substr)
-	  (<= 0 (str-index s substr)))
+      (<= 0 (str-index s substr)))
 
 (defn cut (s sep)
-	  (let (cut-at (str-index s sep))
-		(list (gets s 0 cut-at)
-			  (gets s (+ cut-at (len sep))))))
+      (let (cut-at (str-index s sep))
+        (list (gets s 0 cut-at)
+              (gets s (+ cut-at (len sep))))))
 
 (defn upper (s)
-	  (if (lower? c)
-		(char (- (codepoint c) 32))
-		c))
+      (map s
+           (fn (c)
+               (if (lower? c)
+                 (char (- (codepoint c) 32))
+                 c))))
 
 (defn lower (s)
-	  (if (upper? c)
-		(char (+ (codepoint c) 32))
-		c))
+      (map s
+           (fn (c)
+               (if (upper? c)
+                 (char (+ (codepoint c) 32))
+                 c))))
 
 (defn matches-at? (s substr i)
-	  (= (gets s i (+ i (len substr)))
-		 substr))
+      (= (gets s i (+ i (len substr)))
+         substr))
 
 (defn replace (s old new)
-	  (if (empty? old)
-		s
-		(do
-		  (def lnew (len new))
-		  (def lold (len old))
-		  (defn -replace (acc i)
-				(if (matches-at? acc old i)
-				  (-replace (+ (gets acc 0 i)
-							   new
-							   (gets acc (+ i lold)))
-							(+ i lnew))
-				  (if (< i (len acc))
-					(-replace acc (inc i))
-					acc)))
-		  (-replace s 0))))
+      (if (empty? old)
+        s
+        (do
+          (def lnew (len new))
+          (def lold (len old))
+          (defn -replace (acc i)
+                (if (matches-at? acc old i)
+                  (-replace (+ (gets acc 0 i)
+                               new
+                               (gets acc (+ i lold)))
+                            (+ i lnew))
+                  (if (< i (len acc))
+                    (-replace acc (inc i))
+                    acc)))
+          (-replace s 0))))
 
 (defn split (s sep)
-	  (if (empty? sep)
-		(reduce s (list) <<)
-		(do
-		  (def lsep (len sep))
-		  (defn -split (coll i last)
-				(if (matches-at? s sep i)
-				  (-split (<< coll (gets s last i))
-						  (+ i lsep)
-						  (+ i lsep))
-				  (if (< i (len s))
-					(-split coll (inc i) last)
-					(<< coll (gets s last)))))
-		  (-split (list) 0 0))))
+      (if (empty? sep)
+        (reduce s (list) <<)
+        (do
+          (def lsep (len sep))
+          (defn -split (coll i last)
+                (if (matches-at? s sep i)
+                  (-split (<< coll (gets s last i))
+                          (+ i lsep)
+                          (+ i lsep))
+                  (if (< i (len s))
+                    (-split coll (inc i) last)
+                    (<< coll (gets s last)))))
+          (-split (list) 0 0))))
 
 (defn extend (pad n)
-	  (do
-		(def times (int (/ n (len pad))))
-		(def part (% n (len pad)))
-		(defn -extend (base i)
-			  (if (zero? i)
-				(<< base (gets pad 0 part))
-				(-extend (<< base pad)
-						 (dec i))))
-		(-extend '' times)))
+      (do
+        (def times (int (/ n (len pad))))
+        (def part (% n (len pad)))
+        (defn -extend (base i)
+              (if (zero? i)
+                (<< base (gets pad 0 part))
+                (-extend (<< base pad)
+                         (dec i))))
+        (-extend '' times)))
 
 (defn pad-start (s n pad)
-	  (if (>= (len s) n)
-		s
-		(+ (extend pad (- n (len s)))
-		   s)))
+      (if (>= (len s) n)
+        s
+        (+ (extend pad (- n (len s)))
+           s)))
 
 (defn pad-end (s n pad)
-	  (if (>= (len s) n)
-		s
-		(+ s
-		   (extend pad (- n (len s))))))
+      (if (>= (len s) n)
+        s
+        (+ s
+           (extend pad (- n (len s))))))
 
 (defn trim-start-space (s)
-	  (do
-		(defn start (i)
-			  (if (space? (char-at s i))
-				(start (inc i))
-				i))
-		(gets s (start 0))))
+      (do
+        (defn start (i)
+              (if (space? (char-at s i))
+                (start (inc i))
+                i))
+        (gets s (start 0))))
 
 (defn trim-start-non-empty (s prefix)
-	  (do
-		(def max (len s))
-		(def lpref (len prefix))
-		(defn -trim (i)
-			  (if (< i max)
-				(if (matches-at? s prefix i)
-				  (-trim (+ i lpref))
-				  i)
-				i))
-		(gets s (-trim 0))))
+      (do
+        (def max (len s))
+        (def lpref (len prefix))
+        (defn -trim (i)
+              (if (< i max)
+                (if (matches-at? s prefix i)
+                  (-trim (+ i lpref))
+                  i)
+                i))
+        (gets s (-trim 0))))
 
 (defn trim-start (s prefix)
-	  (match prefix
-			 ('' s)
-			 (() (trim-start-space s))
-			 ((trim-start-non-empty s prefix))))
+      (match prefix
+             ('' s)
+             (() (trim-start-space s))
+             ((trim-start-non-empty s prefix))))
 
 (defn trim-end-space (s)
-	  (do
-		(defn end (i)
-			  (if (space? (char-at s i))
-				(end (dec i))
-				i))
-		(gets s 0 (inc (end (dec (len s)))))))
+      (do
+        (defn end (i)
+              (if (space? (char-at s i))
+                (end (dec i))
+                i))
+        (gets s 0 (inc (end (dec (len s)))))))
 
 (defn trim-end-non-empty (s suffix)
-	  (do
-		(def lsuf (len suffix))
-		(defn -trim (i)
-			  (if (> i -1)
-				(if (matches-at? s suffix (- i lsuf))
-				  (-trim (- i lsuf))
-				  i)
-				i))
-		(gets s 0 (-trim (len s)))))
+      (do
+        (def lsuf (len suffix))
+        (defn -trim (i)
+              (if (> i -1)
+                (if (matches-at? s suffix (- i lsuf))
+                  (-trim (- i lsuf))
+                  i)
+                i))
+        (gets s 0 (-trim (len s)))))
 
 (defn trim-end (s suffix)
-	  (match suffix
-			 ('' s)
-			 (() (trim-end-space s))
-			 ((trim-end-non-empty s suffix))))
+      (match suffix
+             ('' s)
+             (() (trim-end-space s))
+             ((trim-end-non-empty s suffix))))
 
 (defn trim (s part)
-	  (-> s
-		  (trim-start part)
-		  (trim-end part)))
+      (-> s
+          (trim-start part)
+          (trim-end part)))
 

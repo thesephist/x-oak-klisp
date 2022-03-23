@@ -2,35 +2,35 @@
 
 (defmacro run-tests (terms)
   (quasiquote
-	(let (results (unquote (cons ,list terms)))
-	  (let (passed? cadr)
-		(do
-		  (-> results
-			  (exclude passed?)
-			  (each (fn (r)
-						(let (name (car r))
-						  (let (got (car (cddr r)))
-							(let (expected (cadr (cddr r)))
-							  (println (+ name
-										  ': expected '
-										  (->string expected)
-										  ', got '
-										  (->string got)))))))))
-		  (println (+ (->string (-> results
-									(filter passed?)
-									size))
-					  '/'
-					  (->string (size results)))
-				   'tests passed.'))))))
+    (let (results (unquote (cons ,list terms)))
+      (let (passed? cadr)
+        (do
+          (-> results
+              (exclude passed?)
+              (each (fn (r)
+                        (let (name (car r))
+                          (let (got (car (cddr r)))
+                            (let (expected (cadr (cddr r)))
+                              (println (+ name
+                                          ': expected '
+                                          (->string expected)
+                                          ', got '
+                                          (->string got)))))))))
+          (println (+ (->string (-> results
+                                    (filter passed?)
+                                    size))
+                      '/'
+                      (->string (size results)))
+                   'tests passed.'))))))
 
 (defmacro test (terms)
   (do
-	(def name (car terms))
-	(def expected (cadr terms))
-	(def body (car (cddr terms)))
-	(quasiquote
-	  (let (got (unquote body))
-		(list (unquote name)
-			  (= got (unquote expected)) ; result
-			  got (unquote expected))))))
+    (def name (car terms))
+    (def expected (cadr terms))
+    (def body (car (cddr terms)))
+    (quasiquote
+      (let (got (unquote body))
+        (list (unquote name)
+              (= got (unquote expected)) ; result
+              got (unquote expected))))))
 
