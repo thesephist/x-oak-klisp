@@ -46,7 +46,7 @@
          prefix))
 
 (defn ends-with? (s suffix)
-      (= (gets s (- (len s) (len prefix)))
+      (= (gets s (- (len s) (len suffix)))
          suffix))
 
 (defn str-index (s substr)

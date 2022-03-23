@@ -1,6 +1,6 @@
 # Klisp in Oak 🌳
 
-This repository holds an implementation of an interpreter for **[Klisp](https://github.com/thesephist/klisp)**, my toy dialect of Lisp, **written in [Oak](https://oaklang.org/)** as opposed to the original [Ink](https://dotink.co/). Klisp now has several implementations, of which this repository contains the **most complete and correct version**. In pursuit of that completeness, this repository contains a way to build an "installable" `klisp` binary, as well as a broad standard library and growing test suite. But Klisp started as a learning project for me to learn about lisp, and that remains true.
+This repository holds an implementation of an interpreter for **[Klisp](https://github.com/thesephist/klisp)**, my toy dialect of Lisp, **written in [Oak](https://oaklang.org/)** as opposed to the original [Ink](https://dotink.co/). Klisp now has several implementations, of which this repository contains the **most complete and correct version**. In pursuit of that completeness, this repository contains a way to build an "installable" `klisp` binary, as well as a broad standard library and growing test suite. But Klisp started as a learning project for me to learn about Lisp, and that remains true.
 
 If you've stumbled onto this repository, you might notice it's quite bare compared to my norm. I didn't really open-source this for anyone's benefit but my own -- I need some place to put this code, and it seemed like it had gotten big enough that it warranted its own small repository.
 
@@ -23,7 +23,7 @@ Klisp interpreter v0.1-oak.
 4950
 ```
 
-Klisp supports common string/list operations and macros like the [threading macros](https://clojure.org/guides/threading_macros) `->` and `->>`, which makes certain kinds of programs very pleasant to write and easy to read. The repl supports multi-line input for more complex expressions.
+Klisp supports common string/list operations and macros like the [threading macros](https://clojure.org/guides/threading_macros) `->` and `->>`, which make certain kinds of programs very pleasant to write and easy to read. The repl supports multi-line input for more complex expressions.
 
 ```clj
 λ (-> 'Hello Klisp!'
@@ -57,7 +57,7 @@ Of course, you can define functions and use them in your programs.
 ()
 ```
 
-Klisp has good design and [standard library support for working with iterable data types](lib/iter.klisp) like strings and lists. For example, the `list-of` macro generates a list from a count and a given expression. Here, we can use tools like this toss 100 fair coins.
+Klisp has good [standard library support for working with iterable data types](lib/iter.klisp) like strings and lists. For example, the `list-of` macro generates a list from a count and an expression. Here, we can use tools like this to toss 100 fair coins.
 
 ```clj
 λ (list-of 10 (rand-choice (list 'head' 'tail')))
@@ -104,7 +104,7 @@ true
 (1 2 3 4 5 6 7 8 9 10 12 14 15 16 18 20 21 24 25 27 28 30 32 35 36 40 42 45 48 50 54 56 60 63 64 70 72 75 80 81 84 90 96 100 105 108 112 120 126 128 135 140 144 150 160 162 168 175 180 189 192 200 210 216 224 225 240 252 256 270 280 288 300 315 320 324 336 350 360 378 384 400 405 420 432 448 450 480 504 525 540 560 567 576 600 630 640 648 672 675 700 720 756 768 800 810 840 864 896 900 945 960 1008 1050 1080 1120 1134 1152 1200 1260 1280 1296 1344 1350 1400 1440 1512 1575 1600 1620 1680 1728 1792 1800 1890 1920 2016 2025 2100 2160 2240 2268 2304 2400 2520 2592 2688 2700 2800 2835 2880 3024 3150 3200 3240 3360 3456 3600 3780 3840 4032 4050 4200 4320 4480 4536 4725 4800 5040 5184 5376 5400 5600 5670 5760 6048 6300 6400 6480 6720 6912 7200 7560 8064 8100 8400 8640 8960 9072 9450 9600 10080 10368 10800 11200 11340 11520 12096 12600 12960 13440 14175 14400 15120 16128 16200 16800 17280 18144 18900 19200 20160 20736 21600 22400 22680 24192 25200 25920 26880 28350 28800 30240 32400 33600 34560 36288 37800 40320 43200 44800 45360 48384 50400 51840 56700 57600 60480 64800 67200 72576 75600 80640 86400 90720 100800 103680 113400 120960 129600 134400 145152 151200 172800 181440 201600 226800 241920 259200 302400 362880 403200 453600 518400 604800 725760 907200 1.2096e+06 1.8144e+06 3.6288e+06)
 ```
 
-Lastly, there are a handful of built-in functions that let Klisp programs interact with the local filesystem in a synchronous, blocking way.
+Lastly, there are a handful of built-in functions that let Klisp programs interact with the local filesystem in a synchronous, blocking way. These are modeled after [Oak's `fs` standard library module functions](https://oaklang.org/lib/fs/).
 
 ```clj
 λ (-> (read-file 'README.md')
