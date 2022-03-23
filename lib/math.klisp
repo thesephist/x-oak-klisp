@@ -1,5 +1,49 @@
 ; math library
 
+(def pi
+     3.14159265358979323846264338327950288419716939937510)
+
+(def e
+     2.71828182845904523536028747135266249775724709369995)
+
+(defn sq (n)
+      (* n n))
+
+(defn hypot (x0 y0 x1 y1)
+      (do
+        (default x1 0)
+        (default y1 0)
+        (sqrt (+ (sq (- x0 x1))
+                 (sq (- y0 y1))))))
+
+(defn scale (x a b c d)
+      (let (normed (/ (- x a) (- b a)))
+        (if (& (nil? c) (nil? d))
+          normed
+          (+ c
+             (* normed (- d c))))))
+
+(defn clamp (x a b)
+      (cond ((< x a) a)
+            ((> x b) b)
+            (x)))
+
+(defn round (n decimals)
+      (do
+        (default decimals 0)
+        (if (< decimals 0)
+          n
+          (let (order (# 10 decimals))
+            (if (>= n 0)
+              (/ (int (+ (* n order) 0.5)) order)
+              (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
+
+(defn even? (n)
+      (zero? (% n 2)))
+
+(defn odd? (n)
+      (= (% n 2) 1))
+
 ; Euclid's GCD algorithm
 (defn gcd (a b)
       ; prereq: a < b
@@ -57,13 +101,12 @@
         (cond
           ((nil? first-half) first-half)
           ((nil? (cdr first-half)) first-half)
-          (true
-            (join first-half
-                  (let (rev-first-half (reverse first-half))
-                    (if (= (car rev-first-half)
-                           (/ n (car rev-first-half)))
-                      (cdr (map rev-first-half (partial (/ n ?))))
-                      (map rev-first-half (partial (/ n ?))))))))))
+          ((append first-half
+                   (let (rev-first-half (reverse first-half))
+                     (if (= (car rev-first-half)
+                            (/ n (car rev-first-half)))
+                       (cdr (map rev-first-half (partial (/ n ?))))
+                       (map rev-first-half (partial (/ n ?))))))))))
 
 (def sum
      (fn (ns) (reduce ns 0 +)))
