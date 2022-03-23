@@ -1,4 +1,29 @@
-; sort library, implementing quicksort
+; sort library, implementing quicksort and mergesort
+
+(defn merge (left right)
+      (cond ((empty? left) right)
+            ((empty? right) left)
+            ((do
+               (def l (first left))
+               (def r (first right))
+               (if (<= l r)
+                 (conj l (merge (rest left) right))
+                 (conj r (merge left (rest right))))))))
+
+(defn mergesort (xs)
+      (if (< (size xs) 2)
+        xs
+        (let (split-at (int (/ (size xs) 2)))
+          (merge (mergesort (take xs split-at))
+                 (mergesort (drop xs split-at))))))
+
+(defn quicksort (xs)
+      (if (< (size xs) 2)
+        xs
+        (let (pivot (nth xs (int (/ (dec (size xs)) 2)))) ; heuristic: pick midpoint
+          (-> (quicksort (filter xs (partial (< ? pivot))))
+              (<< pivot)
+              (append (quicksort (filter xs (partial (> ? pivot)))))))))
 
 (defn sort! (xs pred)
       (do
