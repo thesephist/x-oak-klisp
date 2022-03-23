@@ -10,7 +10,7 @@ This repo started out as a sort of a (manual, partial) fork of [thesephist/klisp
 
 This is a walkthrough of a sample interactive repl session in Klisp. It shows off some parts of the language (and Lisps in general) that I like.
 
-When you first fire up `klisp`, you see a prompt. The prompt starts with a `λ` because I am an uber nerd and I like how it looks. (It's also an un-subtle reference to the [labmda calculus](https://dotink.co/posts/lambda/).) Klisp can do basic things like math and list operations.
+When you first fire up `klisp`, you see a prompt. The prompt starts with a `λ` because I am a nerd and I like how it looks. (It's an un-subtle reference to the [lambda calculus](https://dotink.co/posts/lambda/).) Klisp can do basic things like math and list operations.
 
 ```clj
 $ klisp
@@ -23,21 +23,27 @@ Klisp interpreter v0.1-oak.
 4950
 ```
 
-Klisp supports common string/list operations and macros like the [threading macros](https://clojure.org/guides/threading_macros) `->` and `->>`, which makes certain kinds of programs very pleasant to write and easy to read.
+Klisp supports common string/list operations and macros like the [threading macros](https://clojure.org/guides/threading_macros) `->` and `->>`, which makes certain kinds of programs very pleasant to write and easy to read. The repl supports multi-line input for more complex expressions.
 
-```
-λ (-> 'Hello Klisp!' upper (split ' ') reverse)
+```clj
+λ (-> 'Hello Klisp!'
+      upper
+      (split ' ')
+      reverse)
 ('KLISP!' 'HELLO')
 ```
 
 Of course, you can define functions and use them in your programs.
 
-```
-λ (defn factorial (n) (prod (nat n)))
+```clj
+λ (defn factorial (n)
+        (prod (nat n)))
 (fn (n) (prod (nat n)))
 λ (factorial 10)
 3628800
-λ (-> (nat 10) (map factorial) (each println))
+λ (-> (nat 10)
+      (map factorial)
+      (each println))
 1
 2
 6
@@ -53,23 +59,29 @@ Of course, you can define functions and use them in your programs.
 
 Klisp has good design and [standard library support for working with iterable data types](lib/iter.klisp) like strings and lists. For example, the `list-of` macro generates a list from a count and a given expression. Here, we can use tools like this toss 100 fair coins.
 
-```
+```clj
 λ (list-of 10 (rand-choice (list 'head' 'tail')))
 ('tail' 'tail' 'head' 'tail' 'head' 'tail' 'head' 'tail' 'head' 'head')
 λ (-> (list-of 100 (rand-choice (list 'head' 'tail'))) sort partition)
 (('head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head' 'head') ('tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail' 'tail'))
-λ (-> (list-of 100 (rand-choice (list 'head' 'tail'))) freq)
+λ (->
+    (list-of 100 (rand-choice (list 'head' 'tail')))
+    freq)
 (('head' . 44) ('tail' . 56))
 ```
 
 Klisp also has a decent library for manipulating strings (which are byte arrays). Here are some of them in action:
 
-```
+```clj
 λ (replace 'Hello, World!' 'World' 'Klisp')
 'Hello, Klisp!'
 λ (trim '           So much space!\t\n        ')
 'So much space!'
-λ (defn format-num (n) (-> n (round 2) ->string (pad-start 8 ' ')))
+λ (defn format-num (n)
+        (-> n
+            (round 2)
+            ->string
+            (pad-start 8 ' ')))
 (fn (n) (-> n (round 2) ->string (pad-start 8 ' ')))
 λ (format-num 25.6789)
 '   25.68'
@@ -77,7 +89,7 @@ Klisp also has a decent library for manipulating strings (which are byte arrays)
 
 Klisp has some fun stuff in the [math library](lib/math.klisp), which I added mostly to have some more compute-intensive functions to test the interpreter. `prime-factors` and `factors` are particularly fun.
 
-```
+```clj
 λ (factor? 10 2)
 true
 λ (prime-factors 10)
@@ -94,12 +106,20 @@ true
 
 Lastly, there are a handful of built-in functions that let Klisp programs interact with the local filesystem in a synchronous, blocking way.
 
-```
-λ (-> (read-file 'README.md') (split '\n') (filter (partial (starts-with? ? '- '))) (map upper))
+```clj
+λ (-> (read-file 'README.md')
+      (split '\n')
+      (filter (partial (starts-with? ? '- ')))
+      (map upper))
 ('- FINISH `LIB/JSON`' '- AUTO-INDENT IN THE REPL, BASED ON PARSER ERRORS' '- LET\\* (OR MAKE LET POLYMORPHIC)' '- DOCSTRINGS LIKE CLOJURE, DEFINED AS STRINGS. JUST TRIM EACH LINE.' '- MAYBE I SHOULD BUILD UTILITIES TO BE ABLE TO WORK WITH KNOWLEDGE BASES IN KLISP? BRING BACK XIN NOTES.' '- FORMAT SOURCE FILES: `OAK FMT KLISP.OAK BUILD.OAK --FIX`' '- INSTALL TO `/USR/LOCAL/BIN/KLISP`: `OAK BUILD.OAK`' '- RUN TESTS: `KLISP TEST.KLISP`')
-λ (-> (list-files 'lib') (map (partial (getc ? ,name))) sort)
+λ (-> (list-files 'lib')
+      (map (partial (getc ? ,name)))
+      sort)
 ('comp.klisp' 'iter.klisp' 'json.klisp' 'klisp.klisp' 'macro.klisp' 'math.klisp' 'random.klisp' 'sort.klisp' 'str.klisp' 'test.klisp')
-λ (-> (list-files 'lib') (map (partial (getc ? ,name))) (map (partial (trim-end ? '.klisp'))) sort)
+λ (-> (list-files 'lib')
+      (map (partial (getc ? ,name)))
+      (map (partial (trim-end ? '.klisp')))
+      sort)
 ('comp' 'iter' 'json' 'klisp' 'macro' 'math' 'random' 'sort' 'str' 'test')
 ```
 
