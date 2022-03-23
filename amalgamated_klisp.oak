@@ -266,7 +266,10 @@ fn eval(L, env) if type(L) {
 		}
 		:fn -> {
 			params := L.(1).0
-			body := L.(1).(1).0
+			body := if L.(1).(1).1 {
+				? -> L.(1).(1).0
+				_ -> L.(1).(1).(1).0
+			}
 			makeFn(fn(args) eval(
 				body
 				{
@@ -284,7 +287,10 @@ fn eval(L, env) if type(L) {
 		}
 		:macro -> {
 			params := L.(1).0
-			body := L.(1).(1).0
+			body := if L.(1).(1).1 {
+				? -> L.(1).(1).0
+				_ -> L.(1).(1).(1).0
+			}
 			makeMacro(fn(args) eval(
 				body
 				{
@@ -313,6 +319,10 @@ fn eval(L, env) if type(L) {
 				}
 				_ -> expr
 			}
+		}
+		:doc -> {
+			impl := eval(L.(1).0, env).2
+			if impl.(1).(1).1 != ? -> impl.(1).(1).0
 		}
 		_ -> {
 			argcs := L.1
@@ -705,13 +715,20 @@ fn loadStdlib(withEnv) loadLibSources([
 (def let
      (macro (terms)
             (do
-              (def decl (car terms))
-              (def declname (car decl))
-              (def declval (cadr decl))
-              (def body (cadr terms))
-              (list
-                (list ,fn (list declname) body)
-                declval))))
+              (defn make-let (decl body)
+                    (do
+                      (def declname (car decl))
+                      (def declval (cadr decl))
+                      (list
+                        (list ,fn (list declname) body)
+                        declval)))
+              (defn expand-let (terms)
+                    (make-let
+                      (car terms)
+                      (if (nil? (cddr terms))
+                        (cadr terms)
+                        (expand-let (cdr terms)))))
+              (expand-let terms))))
 
 (def when-let
      (macro (terms)
@@ -758,18 +775,19 @@ fn loadStdlib(withEnv) loadLibSources([
                                 (list ,quasiquote term))
                               (list ,quote term)))))))
 
+(def list-of
+     (macro (terms)
+            (let
+              (n (car terms))
+              (f (cadr terms))
+              (quasiquote
+                (-> (range (unquote n))
+                    (map-list (fn () (unquote f))))))))
+
 (def do-times
      (macro (terms)
             (cons ,do
                   (list-of (car terms) (list (cadr terms))))))
-
-(def list-of
-     (macro (terms)
-            (let (n (car terms))
-              (let (f (cadr terms))
-                (quasiquote
-                  (-> (range (unquote n))
-                      (map-list (fn () (unquote f)))))))))
 
 ; (default name value)
 (def default
@@ -802,15 +820,15 @@ fn loadStdlib(withEnv) loadLibSources([
      (macro (terms)
             (quasiquote
               (def (unquote (car terms))
-                   (fn (unquote (cadr terms))
-                       (unquote (car (cddr terms))))))))
+                   (unquote (cons (quote fn)
+                                  (cdr terms)))))))
 
 (def defmacro
      (macro (terms)
             (quasiquote
               (def (unquote (car terms))
-                   (macro (unquote (cadr terms))
-                          (unquote (car (cddr terms))))))))
+                   (unquote (cons (quote macro)
+                                  (cdr terms)))))))
 
 ; (cond (pred body) (pred body) (default-body))
 (def cond
@@ -980,18 +998,18 @@ fn loadStdlib(withEnv) loadLibSources([
 ; generic iterator implementations
 
 (defn nth (xs i)
-	  (if (not-pos? i)
-		(if (zero? i)
-		  (first xs)
-		  (base-iterator xs))
-		(nth (rest xs) (dec i))))
+      (if (not-pos? i)
+        (if (zero? i)
+          (first xs)
+          (base-iterator xs))
+        (nth (rest xs) (dec i))))
 
 (defn nth! (xs i x)
-	  (if (list? xs)
-		(if (not-pos? i)
-		  (first! xs x)
-		  (nth! (rest xs) (dec i) x))
-		(sets! xs i (char-at x 0))))
+      (if (list? xs)
+        (if (not-pos? i)
+          (first! xs x)
+          (nth! (rest xs) (dec i) x))
+        (sets! xs i (char-at x 0))))
 
 (defn second (xs)
       (nth xs 2))
@@ -1145,6 +1163,9 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn flatten (xs)
       (reduce xs () append))
 
+(defn compact (xs)
+      (exclude xs (is ())))
+
 (defn partition (xs by)
       (match (type by)
              (,nil (partition xs id))
@@ -1162,7 +1183,8 @@ fn loadStdlib(withEnv) loadLibSources([
                                   (list () ())
                                   (let (first-half (conj (first xs)
                                                          (take-while (rest xs)
-                                                                     (is (f (first xs))))))
+                                                                     (let (f-of-first (f (first xs)))
+                                                                       (fn (x) (= (f x) f-of-first))))))
                                     (list first-half
                                           (drop xs (size first-half))))))
                           (defn -partition (xs f)
@@ -1176,203 +1198,255 @@ fn loadStdlib(withEnv) loadLibSources([
                                           (-partition rest-half f)))))
                           (-partition xs by)))))
 
+(defn uniq (xs by)
+      (-> (partition xs by)
+          (map first)))
+
 '
 	'; string library, modeled after oak/libstr
 
 (defn char-at (s i)
-	  (gets s i (inc i)))
+      (gets s i (inc i)))
 
 (defn char-between? (c start end)
-	  (& (<= start c) (<= c end)))
+      (& (<= start c) (<= c end)))
 
 (defn upper? (c)
-	  (char-between? c \'A\' \'Z\'))
+      (char-between? c \'A\' \'Z\'))
 
 (defn lower? (c)
-	  (char-between? c \'a\' \'z\'))
+      (char-between? c \'a\' \'z\'))
 
 (defn digit? (c)
-	  (char-between? c \'0\' \'9\'))
+      (char-between? c \'0\' \'9\'))
 
 (defn space? (c)
-	  (| (= c \' \')
-		 (= c \'\t\')
-		 (= c \'\n\')
-		 (= c \'\r\')
-		 (= c \'\f\')))
+      (| (= c \' \')
+         (= c \'\\t\')
+         (= c \'\\n\')
+         (= c \'\\r\')
+         (= c \'\\f\')))
 
 (defn letter? (c)
-	  (| (upper? c) (lower? c)))
+      (| (upper? c) (lower? c)))
 
 (defn word? (c)
-	  (| (letter? c) (digit? c)))
+      (| (letter? c) (digit? c)))
 
 (defn join (strings joiner)
-	  (do
-		(default joiner \'\')
-		(if (nil? strings)
-		  \'\'
-		  (do
-			(defn -join (acc strings)
-				  (if (nil? strings)
-					acc
-					(-join (+ acc joiner (car strings))
-						   (cdr strings))))
-			(-join (car strings) (cdr strings))))))
+      (do
+        (default joiner \'\')
+        (if (nil? strings)
+          \'\'
+          (do
+            (defn -join (acc strings)
+                  (if (nil? strings)
+                    acc
+                    (-join (+ acc joiner (car strings))
+                           (cdr strings))))
+            (-join (car strings) (cdr strings))))))
 
 (defn starts-with? (s prefix)
-	  (= (gets s 0 (len prefix))
-		 prefix))
+      (= (gets s 0 (len prefix))
+         prefix))
 
 (defn ends-with? (s suffix)
-	  (= (gets s (- (len s) (len prefix)))
-		 suffix))
+      (= (gets s (- (len s) (len prefix)))
+         suffix))
 
 (defn str-index (s substr)
-	  (do
-		(defn -iter (i)
-			  (if (<= (len s) i)
-				-1
-				(if (= (gets s i (+ i (len substr))) substr)
-				  i
-				  (-iter (inc i)))))
-		(-iter 0)))
+      (do
+        (defn -iter (i)
+              (if (<= (len s) i)
+                -1
+                (if (= (gets s i (+ i (len substr))) substr)
+                  i
+                  (-iter (inc i)))))
+        (-iter 0)))
 
 (defn str-contains? (s substr)
-	  (<= 0 (str-index s substr)))
+      (<= 0 (str-index s substr)))
 
 (defn cut (s sep)
-	  (let (cut-at (str-index s sep))
-		(list (gets s 0 cut-at)
-			  (gets s (+ cut-at (len sep))))))
+      (let (cut-at (str-index s sep))
+        (list (gets s 0 cut-at)
+              (gets s (+ cut-at (len sep))))))
 
 (defn upper (s)
-	  (if (lower? c)
-		(char (- (codepoint c) 32))
-		c))
+      (map s
+           (fn (c)
+               (if (lower? c)
+                 (char (- (codepoint c) 32))
+                 c))))
 
 (defn lower (s)
-	  (if (upper? c)
-		(char (+ (codepoint c) 32))
-		c))
+      (map s
+           (fn (c)
+               (if (upper? c)
+                 (char (+ (codepoint c) 32))
+                 c))))
 
 (defn matches-at? (s substr i)
-	  (= (gets s i (+ i (len substr)))
-		 substr))
+      (= (gets s i (+ i (len substr)))
+         substr))
 
 (defn replace (s old new)
-	  (if (empty? old)
-		s
-		(do
-		  (def lnew (len new))
-		  (def lold (len old))
-		  (defn -replace (acc i)
-				(if (matches-at? acc old i)
-				  (-replace (+ (gets acc 0 i)
-							   new
-							   (gets acc (+ i lold)))
-							(+ i lnew))
-				  (if (< i (len acc))
-					(-replace acc (inc i))
-					acc)))
-		  (-replace s 0))))
+      (if (empty? old)
+        s
+        (do
+          (def lnew (len new))
+          (def lold (len old))
+          (defn -replace (acc i)
+                (if (matches-at? acc old i)
+                  (-replace (+ (gets acc 0 i)
+                               new
+                               (gets acc (+ i lold)))
+                            (+ i lnew))
+                  (if (< i (len acc))
+                    (-replace acc (inc i))
+                    acc)))
+          (-replace s 0))))
 
 (defn split (s sep)
-	  (if (empty? sep)
-		(reduce s (list) <<)
-		(do
-		  (def lsep (len sep))
-		  (defn -split (coll i last)
-				(if (matches-at? s sep i)
-				  (-split (<< coll (gets s last i))
-						  (+ i lsep)
-						  (+ i lsep))
-				  (if (< i (len s))
-					(-split coll (inc i) last)
-					(<< coll (gets s last)))))
-		  (-split (list) 0 0))))
+      (if (empty? sep)
+        (reduce s (list) <<)
+        (do
+          (def lsep (len sep))
+          (defn -split (coll i last)
+                (if (matches-at? s sep i)
+                  (-split (<< coll (gets s last i))
+                          (+ i lsep)
+                          (+ i lsep))
+                  (if (< i (len s))
+                    (-split coll (inc i) last)
+                    (<< coll (gets s last)))))
+          (-split (list) 0 0))))
 
 (defn extend (pad n)
-	  (do
-		(def times (int (/ n (len pad))))
-		(def part (% n (len pad)))
-		(defn -extend (base i)
-			  (if (zero? i)
-				(<< base (gets pad 0 part))
-				(-extend (<< base pad)
-						 (dec i))))
-		(-extend \'\' times)))
+      (do
+        (def times (int (/ n (len pad))))
+        (def part (% n (len pad)))
+        (defn -extend (base i)
+              (if (zero? i)
+                (<< base (gets pad 0 part))
+                (-extend (<< base pad)
+                         (dec i))))
+        (-extend \'\' times)))
 
 (defn pad-start (s n pad)
-	  (if (>= (len s) n)
-		s
-		(+ (extend pad (- n (len s)))
-		   s)))
+      (if (>= (len s) n)
+        s
+        (+ (extend pad (- n (len s)))
+           s)))
 
 (defn pad-end (s n pad)
-	  (if (>= (len s) n)
-		s
-		(+ s
-		   (extend pad (- n (len s))))))
+      (if (>= (len s) n)
+        s
+        (+ s
+           (extend pad (- n (len s))))))
 
 (defn trim-start-space (s)
-	  (do
-		(defn start (i)
-			  (if (space? (char-at s i))
-				(start (inc i))
-				i))
-		(gets s (start 0))))
+      (do
+        (defn start (i)
+              (if (space? (char-at s i))
+                (start (inc i))
+                i))
+        (gets s (start 0))))
 
 (defn trim-start-non-empty (s prefix)
-	  (do
-		(def max (len s))
-		(def lpref (len prefix))
-		(defn -trim (i)
-			  (if (< i max)
-				(if (matches-at? s prefix i)
-				  (-trim (+ i lpref))
-				  i)
-				i))
-		(gets s (-trim 0))))
+      (do
+        (def max (len s))
+        (def lpref (len prefix))
+        (defn -trim (i)
+              (if (< i max)
+                (if (matches-at? s prefix i)
+                  (-trim (+ i lpref))
+                  i)
+                i))
+        (gets s (-trim 0))))
 
 (defn trim-start (s prefix)
-	  (match prefix
-			 (\'\' s)
-			 (() (trim-start-space s))
-			 ((trim-start-non-empty s prefix))))
+      (match prefix
+             (\'\' s)
+             (() (trim-start-space s))
+             ((trim-start-non-empty s prefix))))
 
 (defn trim-end-space (s)
-	  (do
-		(defn end (i)
-			  (if (space? (char-at s i))
-				(end (dec i))
-				i))
-		(gets s 0 (inc (end (dec (len s)))))))
+      (do
+        (defn end (i)
+              (if (space? (char-at s i))
+                (end (dec i))
+                i))
+        (gets s 0 (inc (end (dec (len s)))))))
 
 (defn trim-end-non-empty (s suffix)
-	  (do
-		(def lsuf (len suffix))
-		(defn -trim (i)
-			  (if (> i -1)
-				(if (matches-at? s suffix (- i lsuf))
-				  (-trim (- i lsuf))
-				  i)
-				i))
-		(gets s 0 (-trim (len s)))))
+      (do
+        (def lsuf (len suffix))
+        (defn -trim (i)
+              (if (> i -1)
+                (if (matches-at? s suffix (- i lsuf))
+                  (-trim (- i lsuf))
+                  i)
+                i))
+        (gets s 0 (-trim (len s)))))
 
 (defn trim-end (s suffix)
-	  (match suffix
-			 (\'\' s)
-			 (() (trim-end-space s))
-			 ((trim-end-non-empty s suffix))))
+      (match suffix
+             (\'\' s)
+             (() (trim-end-space s))
+             ((trim-end-non-empty s suffix))))
 
 (defn trim (s part)
-	  (-> s
-		  (trim-start part)
-		  (trim-end part)))
+      (-> s
+          (trim-start part)
+          (trim-end part)))
 
 '
 	'; math library
+
+(def pi
+     3.14159265358979323846264338327950288419716939937510)
+
+(def e
+     2.71828182845904523536028747135266249775724709369995)
+
+(defn sq (n)
+      (* n n))
+
+(defn hypot (x0 y0 x1 y1)
+      (do
+        (default x1 0)
+        (default y1 0)
+        (sqrt (+ (sq (- x0 x1))
+                 (sq (- y0 y1))))))
+
+(defn scale (x a b c d)
+      (let (normed (/ (- x a) (- b a)))
+        (if (& (nil? c) (nil? d))
+          normed
+          (+ c
+             (* normed (- d c))))))
+
+(defn clamp (x a b)
+      (cond ((< x a) a)
+            ((> x b) b)
+            (x)))
+
+(defn round (n decimals)
+      (do
+        (default decimals 0)
+        (if (< decimals 0)
+          n
+          (let (order (# 10 decimals))
+            (if (>= n 0)
+              (/ (int (+ (* n order) 0.5)) order)
+              (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
+
+(defn even? (n)
+      (zero? (% n 2)))
+
+(defn odd? (n)
+      (= (% n 2) 1))
 
 ; Euclid\'s GCD algorithm
 (defn gcd (a b)
@@ -1431,13 +1505,12 @@ fn loadStdlib(withEnv) loadLibSources([
         (cond
           ((nil? first-half) first-half)
           ((nil? (cdr first-half)) first-half)
-          (true
-            (join first-half
-                  (let (rev-first-half (reverse first-half))
-                    (if (= (car rev-first-half)
-                           (/ n (car rev-first-half)))
-                      (cdr (map rev-first-half (partial (/ n ?))))
-                      (map rev-first-half (partial (/ n ?))))))))))
+          ((append first-half
+                   (let (rev-first-half (reverse first-half))
+                     (if (= (car rev-first-half)
+                            (/ n (car rev-first-half)))
+                       (cdr (map rev-first-half (partial (/ n ?))))
+                       (map rev-first-half (partial (/ n ?))))))))))
 
 (def sum
      (fn (ns) (reduce ns 0 +)))
@@ -1470,7 +1543,32 @@ fn loadStdlib(withEnv) loadLibSources([
                        (if (< a b) b a))))))
 
 '
-	'; sort library, implementing quicksort
+	'; sort library, implementing quicksort and mergesort
+
+(defn merge (left right)
+      (cond ((empty? left) right)
+            ((empty? right) left)
+            ((do
+               (def l (first left))
+               (def r (first right))
+               (if (<= l r)
+                 (conj l (merge (rest left) right))
+                 (conj r (merge left (rest right))))))))
+
+(defn mergesort (xs)
+      (if (< (size xs) 2)
+        xs
+        (let (split-at (int (/ (size xs) 2)))
+          (merge (mergesort (take xs split-at))
+                 (mergesort (drop xs split-at))))))
+
+(defn quicksort (xs)
+      (if (< (size xs) 2)
+        xs
+        (let (pivot (nth xs (int (/ (dec (size xs)) 2)))) ; heuristic: pick midpoint
+          (-> (quicksort (filter xs (partial (< ? pivot))))
+              (append (filter xs (is pivot)))
+              (append (quicksort (filter xs (partial (> ? pivot)))))))))
 
 (defn sort! (xs pred)
       (do
@@ -1530,13 +1628,20 @@ fn loadStdlib(withEnv) loadLibSources([
 ; with pseudorandom sources of randomness
 
 (defn rand-bool ()
+      \'returns a random bool with equal chance\'
       (< (rand) 0.5))
 
 (defn rand-int (min max)
+      \'returns a random integer in the range [min, max). If only a
+      single number is given as the argument, the range is assumed
+      to be [0, max) instead.\'
       (int (rand-number (int min)
                         (int max))))
 
 (defn rand-number (min max)
+      \'returns a random float in the range [min, max). If only a
+      single number is given as the argument, the range is assumed
+      to be [0, max) instead.\'
       (do
         (when (nil? max)
           (do
@@ -1546,17 +1651,17 @@ fn loadStdlib(withEnv) loadLibSources([
            (* (rand) (- max min)))))
 
 (defn rand-choice (xs)
-      (nth xs
-           (rand-int 0 (size xs))))
+      \'returns a randomly picked item from the list xs\'
+      (nth xs (rand-int 0 (size xs))))
 
 '
 	'; composites: persistent immutable associative array
 
-; comps store key-value pairs in a list as
-; ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
-; Each entry is a single cons cell rather than a list to make value lookup a bit
-; more efficient.
 (defmacro comp (terms)
+  \'comps store key-value pairs in a list as
+  ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
+  Each entry is a single cons cell rather than a list to make value lookup a
+  bit more efficient.\'
   (do
     (def -comp
          (fn (items)
@@ -1567,33 +1672,34 @@ fn loadStdlib(withEnv) loadLibSources([
                      (-comp (cddr items))))))
     (-comp terms)))
 
-; recursive value lookup by key
 (defn getc (cp k v)
+      \'recursive value lookup by key\'
       (if (nil? cp)
         v
         (if (= k (caar cp))
           (cdar cp)
           (getc (cdr cp) k v))))
 
-; comps are immutable, and new values are set by adding new entries
-; to the head of the comp\'s underlying list. setc does not modify the
-; given comp and returns a new comp with the new key, value set.
 (defn setc (cp k v)
+      \'comps are immutable, and new values are set by adding new entries to the
+      head of the comp\\\'s underlying list. setc does not modify the given comp
+      and returns a new comp with the new key, value set.\'
       (cons (cons k v)
             (exclude cp
                      (partial ((is k) (car ?))))))
 
-; get just the comp keys
 (defn keys (cp)
+      \'get just the comp keys\'
       (map cp car))
 
-; get just the comp values
 (defn values (cp)
+      \'get just the comp values\'
       (map cp cdr))
 
 ; functions with comps
 
 (defn freq (xs)
+      \'return a comp with frequency counts of each unique item in `xs`\'
       (reduce xs
               (comp)
               (fn (counts x)
@@ -1606,37 +1712,39 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defmacro run-tests (terms)
   (quasiquote
-	(let (results (unquote (cons ,list terms)))
-	  (let (passed? cadr)
-		(do
-		  (-> results
-			  (exclude passed?)
-			  (each (fn (r)
-						(let (name (car r))
-						  (let (got (car (cddr r)))
-							(let (expected (cadr (cddr r)))
-							  (println (+ name
-										  \': expected \'
-										  (->string expected)
-										  \', got \'
-										  (->string got)))))))))
-		  (println (+ (->string (-> results
-									(filter passed?)
-									size))
-					  \'/\'
-					  (->string (size results)))
-				   \'tests passed.\'))))))
+    (let
+      (results (unquote (cons ,list terms)))
+      (passed? cadr)
+      (do
+        (-> results
+            (exclude passed?)
+            (each (fn (r)
+                      (let
+                        (name (car r))
+                        (got (car (cddr r)))
+                        (expected (cadr (cddr r)))
+                        (println (+ name
+                                    \': expected \'
+                                    (->string expected)
+                                    \', got \'
+                                    (->string got)))))))
+        (println (+ (->string (-> results
+                                  (filter passed?)
+                                  size))
+                    \'/\'
+                    (->string (size results)))
+                 \'tests passed.\')))))
 
 (defmacro test (terms)
   (do
-	(def name (car terms))
-	(def expected (cadr terms))
-	(def body (car (cddr terms)))
-	(quasiquote
-	  (let (got (unquote body))
-		(list (unquote name)
-			  (= got (unquote expected)) ; result
-			  got (unquote expected))))))
+    (def name (car terms))
+    (def expected (cadr terms))
+    (def body (car (cddr terms)))
+    (quasiquote
+      (let (got (unquote body))
+        (list (unquote name)
+              (= got (unquote expected)) ; result
+              got (unquote expected))))))
 
 '
 ], withEnv)
