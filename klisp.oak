@@ -266,7 +266,10 @@ fn eval(L, env) if type(L) {
 		}
 		:fn -> {
 			params := L.(1).0
-			body := L.(1).(1).0
+			body := if L.(1).(1).1 {
+				? -> L.(1).(1).0
+				_ -> L.(1).(1).(1).0
+			}
 			makeFn(fn(args) eval(
 				body
 				{
@@ -284,7 +287,10 @@ fn eval(L, env) if type(L) {
 		}
 		:macro -> {
 			params := L.(1).0
-			body := L.(1).(1).0
+			body := if L.(1).(1).1 {
+				? -> L.(1).(1).0
+				_ -> L.(1).(1).(1).0
+			}
 			makeMacro(fn(args) eval(
 				body
 				{
@@ -313,6 +319,10 @@ fn eval(L, env) if type(L) {
 				}
 				_ -> expr
 			}
+		}
+		:doc -> {
+			impl := eval(L.(1).0, env).2
+			if impl.(1).(1).1 != ? -> impl.(1).(1).0
 		}
 		_ -> {
 			argcs := L.1

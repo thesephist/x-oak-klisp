@@ -126,15 +126,15 @@
      (macro (terms)
             (quasiquote
               (def (unquote (car terms))
-                   (fn (unquote (cadr terms))
-                       (unquote (car (cddr terms))))))))
+                   (unquote (cons (quote fn)
+                                  (cdr terms)))))))
 
 (def defmacro
      (macro (terms)
             (quasiquote
               (def (unquote (car terms))
-                   (macro (unquote (cadr terms))
-                          (unquote (car (cddr terms))))))))
+                   (unquote (cons (quote macro)
+                                  (cdr terms)))))))
 
 ; (cond (pred body) (pred body) (default-body))
 (def cond
