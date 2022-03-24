@@ -248,6 +248,14 @@
 
 ; utilities
 
+(def str
+     (macro (terms)
+            (if (nil? terms)
+              ''
+              (quasiquote
+                (+ (->string (unquote (car terms)))
+                   (unquote (cons ,str (cdr terms))))))))
+
 (def println
      (macro (terms)
             (cons ,do
