@@ -9,15 +9,15 @@
              ((fn (s) (+ 'sym' s)))
              string->symbol)))
 
-; used for basic macros, not external
 (def map-list
+     'a map implementation used for implementing macros, not meant to be used
+     externally. For a supported "map" implementation, see map in lib/iter.'
      (fn (xs f)
          (if (nil? xs)
            ()
            (cons (f (car xs))
                  (map-list (cdr xs) f)))))
 
-; macros
 (def when
      (macro (terms)
             (list ,if (car terms) (cadr terms) ())))
@@ -103,8 +103,8 @@
             (cons ,do
                   (list-of (car terms) (list (cadr terms))))))
 
-; (default name value)
 (def default
+     '(default name value)'
      (macro (terms)
             (do
               (def name (car terms))
@@ -114,8 +114,8 @@
                   (def (unquote name) (unquote val))
                   ())))))
 
-; (while condition . body)
 (def while
+     '(while condition . body)'
      (macro (terms)
             (do
               (def cndn (car terms))
@@ -144,8 +144,8 @@
                    (unquote (cons (quote macro)
                                   (cdr terms)))))))
 
-; (cond (pred body) (pred body) (default-body))
 (def cond
+     '(cond (pred body) (pred body) (default-body))'
      (macro (terms)
             ((def -cond
                   (fn (terms)
@@ -159,8 +159,8 @@
                               (unquote (-cond (cdr terms)))))))))
              terms)))
 
-; (match val (tag body) (tag body) (default-body))
 (def match
+     '(match val (tag body) (tag body) (default-body))'
      (macro (terms)
             (do
               (def -match-val (gensym))
@@ -178,8 +178,8 @@
                 (let ((unquote -match-val) (unquote (car terms)))
                   (unquote (-match (cdr terms))))))))
 
-; thread-first
 (def ->
+     'thread-first'
      (macro (terms)
             (do
               (def apply-partials
@@ -195,8 +195,8 @@
               (apply-partials (reverse (cdr terms))
                               (car terms)))))
 
-; thread-last
 (def ->>
+     'thread-last'
      (macro (terms)
             (do
               (def apply-partials
@@ -211,8 +211,8 @@
               (apply-partials (reverse (cdr terms))
                               (car terms)))))
 
-; partial application
 (def partial
+     'partial application'
      (macro (terms)
             (let (partial-arg (gensym))
               (list ,fn
@@ -226,8 +226,8 @@
                                 expr)))
                       (-replace-partial-arg (car terms)))))))
 
-; macro expansion functions and macros
 (def macroexpand
+     'macro expansion functions and macros'
      (macro (terms)
             (quasiquote (expand (quote (unquote (car terms)))))))
 
@@ -247,23 +247,21 @@
             (quasiquote (expand-all (quote (unquote (car terms)))))))
 
 ; utilities
+
 (def println
      (macro (terms)
-            ; we expand the macro manually here
-            ; because println should be as fast as possible
             (cons ,do
                   (cons (cons ,print terms)
                         (cons ,(print (char 10))
                               ())))))
 
 (def comment
-     ; add "(comment val)" to an expr head
-     ; to substitute the expr with "val"
+     'add "(comment val)" to an expr head to substitute the expr with "val"'
      (macro (terms) (car terms)))
 
 (def log-runtime
-     ; prints runtime (finish - start) of an expression
-     ; usage: (log-runtime 'label' (do something))
+     'prints runtime (finish - start) of an expression
+     usage: (log-runtime label (do something))'
      (macro (terms)
             (let (-val (gensym))
               (quasiquote
