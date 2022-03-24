@@ -10,9 +10,9 @@
              string->symbol)))
 
 (def map-list
-     'a map implementation used for implementing macros, not meant to be used
-     externally. For a supported "map" implementation, see map in lib/iter.'
      (fn (xs f)
+         'a map implementation used for implementing macros, not meant to be used
+         externally. For a supported "map" implementation, see map in lib/iter.'
          (if (nil? xs)
            ()
            (cons (f (car xs))
@@ -104,8 +104,8 @@
                   (list-of (car terms) (list (cadr terms))))))
 
 (def default
-     '(default name value)'
      (macro (terms)
+            '(default name value)'
             (do
               (def name (car terms))
               (def val (cadr terms))
@@ -115,8 +115,8 @@
                   ())))))
 
 (def while
-     '(while condition . body)'
      (macro (terms)
+            '(while condition . body)'
             (do
               (def cndn (car terms))
               (def body (cdr terms))
@@ -145,8 +145,8 @@
                                   (cdr terms)))))))
 
 (def cond
-     '(cond (pred body) (pred body) (default-body))'
      (macro (terms)
+            '(cond (pred body) (pred body) (default-body))'
             ((def -cond
                   (fn (terms)
                       (if (nil? terms)
@@ -160,8 +160,8 @@
              terms)))
 
 (def match
-     '(match val (tag body) (tag body) (default-body))'
      (macro (terms)
+            '(match val (tag body) (tag body) (default-body))'
             (do
               (def -match-val (gensym))
               (def -match
@@ -179,8 +179,8 @@
                   (unquote (-match (cdr terms))))))))
 
 (def ->
-     'thread-first'
      (macro (terms)
+            'thread-first'
             (do
               (def apply-partials
                    (fn (partials expr)
@@ -196,8 +196,8 @@
                               (car terms)))))
 
 (def ->>
-     'thread-last'
      (macro (terms)
+            'thread-last'
             (do
               (def apply-partials
                    (fn (partials expr)
@@ -212,8 +212,8 @@
                               (car terms)))))
 
 (def partial
-     'partial application'
      (macro (terms)
+            'partial application'
             (let (partial-arg (gensym))
               (list ,fn
                     (list partial-arg)
@@ -227,8 +227,8 @@
                       (-replace-partial-arg (car terms)))))))
 
 (def macroexpand
-     'macro expansion functions and macros'
      (macro (terms)
+            'macro expansion functions and macros'
             (quasiquote (expand (quote (unquote (car terms)))))))
 
 (def expand-all
@@ -256,13 +256,14 @@
                               ())))))
 
 (def comment
-     'add "(comment val)" to an expr head to substitute the expr with "val"'
-     (macro (terms) (car terms)))
+     (macro (terms)
+            'add "(comment val)" to an expr head to substitute the expr with "val"'
+            (car terms)))
 
 (def log-runtime
-     'prints runtime (finish - start) of an expression
-     usage: (log-runtime label (do something))'
      (macro (terms)
+            'prints runtime (finish - start) of an expression
+            usage: (log-runtime label (do something))'
             (let (-val (gensym))
               (quasiquote
                 (do

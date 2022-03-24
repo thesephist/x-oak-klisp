@@ -722,15 +722,15 @@ fn loadStdlib(withEnv) loadLibSources([
              ((fn (s) (+ \'sym\' s)))
              string->symbol)))
 
-; used for basic macros, not external
 (def map-list
      (fn (xs f)
+         \'a map implementation used for implementing macros, not meant to be used
+         externally. For a supported "map" implementation, see map in lib/iter.\'
          (if (nil? xs)
            ()
            (cons (f (car xs))
                  (map-list (cdr xs) f)))))
 
-; macros
 (def when
      (macro (terms)
             (list ,if (car terms) (cadr terms) ())))
@@ -816,9 +816,9 @@ fn loadStdlib(withEnv) loadLibSources([
             (cons ,do
                   (list-of (car terms) (list (cadr terms))))))
 
-; (default name value)
 (def default
      (macro (terms)
+            \'(default name value)\'
             (do
               (def name (car terms))
               (def val (cadr terms))
@@ -827,9 +827,9 @@ fn loadStdlib(withEnv) loadLibSources([
                   (def (unquote name) (unquote val))
                   ())))))
 
-; (while condition . body)
 (def while
      (macro (terms)
+            \'(while condition . body)\'
             (do
               (def cndn (car terms))
               (def body (cdr terms))
@@ -857,9 +857,9 @@ fn loadStdlib(withEnv) loadLibSources([
                    (unquote (cons (quote macro)
                                   (cdr terms)))))))
 
-; (cond (pred body) (pred body) (default-body))
 (def cond
      (macro (terms)
+            \'(cond (pred body) (pred body) (default-body))\'
             ((def -cond
                   (fn (terms)
                       (if (nil? terms)
@@ -872,9 +872,9 @@ fn loadStdlib(withEnv) loadLibSources([
                               (unquote (-cond (cdr terms)))))))))
              terms)))
 
-; (match val (tag body) (tag body) (default-body))
 (def match
      (macro (terms)
+            \'(match val (tag body) (tag body) (default-body))\'
             (do
               (def -match-val (gensym))
               (def -match
@@ -891,9 +891,9 @@ fn loadStdlib(withEnv) loadLibSources([
                 (let ((unquote -match-val) (unquote (car terms)))
                   (unquote (-match (cdr terms))))))))
 
-; thread-first
 (def ->
      (macro (terms)
+            \'thread-first\'
             (do
               (def apply-partials
                    (fn (partials expr)
@@ -908,9 +908,9 @@ fn loadStdlib(withEnv) loadLibSources([
               (apply-partials (reverse (cdr terms))
                               (car terms)))))
 
-; thread-last
 (def ->>
      (macro (terms)
+            \'thread-last\'
             (do
               (def apply-partials
                    (fn (partials expr)
@@ -924,9 +924,9 @@ fn loadStdlib(withEnv) loadLibSources([
               (apply-partials (reverse (cdr terms))
                               (car terms)))))
 
-; partial application
 (def partial
      (macro (terms)
+            \'partial application\'
             (let (partial-arg (gensym))
               (list ,fn
                     (list partial-arg)
@@ -939,9 +939,9 @@ fn loadStdlib(withEnv) loadLibSources([
                                 expr)))
                       (-replace-partial-arg (car terms)))))))
 
-; macro expansion functions and macros
 (def macroexpand
      (macro (terms)
+            \'macro expansion functions and macros\'
             (quasiquote (expand (quote (unquote (car terms)))))))
 
 (def expand-all
@@ -960,24 +960,23 @@ fn loadStdlib(withEnv) loadLibSources([
             (quasiquote (expand-all (quote (unquote (car terms)))))))
 
 ; utilities
+
 (def println
      (macro (terms)
-            ; we expand the macro manually here
-            ; because println should be as fast as possible
             (cons ,do
                   (cons (cons ,print terms)
                         (cons ,(print (char 10))
                               ())))))
 
 (def comment
-     ; add "(comment val)" to an expr head
-     ; to substitute the expr with "val"
-     (macro (terms) (car terms)))
+     (macro (terms)
+            \'add "(comment val)" to an expr head to substitute the expr with "val"\'
+            (car terms)))
 
 (def log-runtime
-     ; prints runtime (finish - start) of an expression
-     ; usage: (log-runtime \'label\' (do something))
      (macro (terms)
+            \'prints runtime (finish - start) of an expression
+            usage: (log-runtime label (do something))\'
             (let (-val (gensym))
               (quasiquote
                 (do
