@@ -211,6 +211,28 @@
               (apply-partials (reverse (cdr terms))
                               (car terms)))))
 
+(def as->
+     (macro (terms)
+            'thread-as: (as-> n 10 (double n) (sq (+ 10 n) 2))'
+            (do
+              (def name (car terms))
+              (def val (cadr terms))
+              (def partials (cddr terms))
+              (defn replace-name (expr partial)
+                    (if (list? partial)
+                      (map-list partial
+                                (fn (x)
+                                    (if (= x name)
+                                      expr
+                                      (replace-name expr x))))
+                      partial))
+              (defn replace-partials (expr partials)
+                    (if (nil? partials)
+                      expr
+                      (replace-partials (replace-name expr (car partials))
+                                        (cdr partials))))
+              (replace-partials val partials))))
+
 (def partial
      (macro (terms)
             'partial application'
@@ -260,7 +282,7 @@
      (macro (terms)
             (cons ,do
                   (cons (cons ,print terms)
-                        (cons ,(print (char 10))
+                        (cons ,(print '\n')
                               ())))))
 
 (def comment
