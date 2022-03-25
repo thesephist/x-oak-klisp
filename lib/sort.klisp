@@ -21,9 +21,9 @@
       (if (< (size xs) 2)
         xs
         (let (pivot (nth xs (int (/ (dec (size xs)) 2)))) ; heuristic: pick midpoint
-          (-> (quicksort (filter xs (partial (< ? pivot))))
+          (-> (quicksort (filter xs (partial < ? pivot)))
               (append (filter xs (is pivot)))
-              (append (quicksort (filter xs (partial (> ? pivot)))))))))
+              (append (quicksort (filter xs (partial > ? pivot))))))))
 
 (defn sort! (xs pred)
       (do

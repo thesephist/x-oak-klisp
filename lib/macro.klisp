@@ -246,7 +246,7 @@
                               (if (= expr ,?)
                                 partial-arg
                                 expr)))
-                      (-replace-partial-arg (car terms)))))))
+                      (-replace-partial-arg terms))))))
 
 (def macroexpand
      (macro (terms)

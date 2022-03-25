@@ -29,7 +29,7 @@
       and returns a new comp with the new key, value set.'
       (cons (cons k v)
             (exclude cp
-                     (partial ((is k) (car ?))))))
+                     (partial = k (car ?)))))
 
 (defn keys (cp)
       'get just the comp keys'
