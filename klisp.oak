@@ -471,7 +471,10 @@ Env := {
 	'string->int': makeNative(fn(L) int(L.0) |> default(0))
 	'string->float': makeNative(fn(L) float(L.0) |> default(0))
 	'string->symbol': makeNative(fn(L) atom(L.0))
-	'->string': makeNative(fn(L) print(L.0))
+	'->string': makeNative(fn(L) if type(x := L.0) {
+		:string -> x
+		_ -> print(L.0)
+	})
 
 	// I/O, system
 	'print': makeNative(fn(L) {
