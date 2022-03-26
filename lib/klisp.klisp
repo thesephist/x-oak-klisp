@@ -82,6 +82,9 @@
 (def is
      (fn (x)
          (fn (y) (= x y))))
+(def constantly
+     (fn (x)
+         (fn () x)))
 
 ; basic math
 (def neg

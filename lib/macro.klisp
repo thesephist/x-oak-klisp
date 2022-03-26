@@ -159,6 +159,23 @@
                               (unquote (-cond (cdr terms)))))))))
              terms)))
 
+(def cond-by
+     (macro (terms)
+            '(cond-by pred value (target body) (target body) (default-body))'
+            (do
+              (def pred (car terms))
+              (def name (cadr terms))
+              (def branches (cddr terms))
+              (defn make-branch (br)
+                    (if (nil? (cdr br))
+                      br
+                      (let (target (car br))
+                        (body (cadr br))
+                        (list (list pred name target)
+                              body))))
+              (cons ,cond
+                    (map-list branches make-branch)))))
+
 (def match
      (macro (terms)
             '(match val (tag body) (tag body) (default-body))'
