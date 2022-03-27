@@ -6,29 +6,34 @@
       (results (unquote (cons ,list terms)))
       (passed? cadr)
       (do
+        (print '\n')
         (-> results
-          (exclude passed?)
-          (each (fn (r)
-                  (let
-                    (name (car r))
-                    (got (car (cddr r)))
-                    (expected (cadr (cddr r)))
-                    (println (+ name
-                                ': expected '
-                                (->string expected)
-                                ', got '
-                                (->string got)))))))
+            (exclude passed?)
+            (each (fn (r)
+                    (let
+                      (name (car r))
+                      (got (car (cddr r)))
+                      (expected (cadr (cddr r)))
+                      (println (+ name
+                                  ': expected '
+                                  (->string expected)
+                                  ', got '
+                                  (->string got)))))))
         (println (+ (->string (-> results
-                                (filter passed?)
-                                size))
+                                  (filter passed?)
+                                  size))
                     '/'
                     (->string (size results)))
                  'tests passed.')))))
 
 (defmacro deftest (name expected body)
   (quasiquote
-    (let (got (unquote body))
-      (list (unquote name)
-            (= got (unquote expected)) ; result
-            got (unquote expected)))))
+    (let
+      (got (unquote body))
+      (passed? (= got (unquote expected)))
+      (do
+        (print (if passed? '.' '!')) ; progress indicator
+        (list (unquote name)
+              passed?
+              got (unquote expected))))))
 
