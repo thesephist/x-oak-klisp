@@ -1,6 +1,6 @@
 ; composites: persistent immutable associative array
 
-(defmacro comp (terms)
+(defmacro comp terms
   'comps store key-value pairs in a list as
   ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
   Each entry is a single cons cell rather than a list to make value lookup a

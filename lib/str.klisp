@@ -41,6 +41,9 @@
                            (cdr strings))))
             (-join (car strings) (cdr strings))))))
 
+(defn str xs
+      (-> xs (map ->string) join))
+
 (defn starts-with? (s prefix)
       (= (gets s 0 (len prefix))
          prefix))

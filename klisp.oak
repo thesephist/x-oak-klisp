@@ -28,6 +28,15 @@ oakPrint := print
 // Oak list -> Klisp list
 fn listify(xs) xs |> reverse() |> reduce(?, fn(L, x) [x, L])
 
+// like std.map, but works on lisp lists
+fn mapSexpr(L, f) {
+	fn sub(mapped, rest) if rest {
+		? -> mapped
+		_ -> sub(mapped << f(rest.0), rest.1)
+	}
+	sub([], L) |> listify()
+}
+
 // like std.reduce, but works on lisp lists
 fn reduceSexpr(L, init, f) {
 	fn sub(acc, node) if node {
@@ -242,7 +251,7 @@ LispNull := fn {}
 LispEmpty := fn {}
 
 fn getv(env, name, err?) if v := env.(string(name)) {
-	? -> if e := env.'-env' {
+	? -> if e := env.'\x00env' {
 		? -> {
 			if err? -> println('Unbound name "' + string(name) + '"')
 			?
@@ -254,10 +263,10 @@ fn getv(env, name, err?) if v := env.(string(name)) {
 	_ -> v
 }
 
-fn setv(env, name, v) if type(v) {
-	:null -> env.(string(name)) := LispNull
-	:empty -> env.(string(name)) := LispEmpty
-	_ -> env.(string(name)) := v
+fn setv(env, name, v) env.(string(name)) := if type(v) {
+	:null -> LispNull
+	:empty -> LispEmpty
+	_ -> v
 }
 
 fn makeFn(f, L) [false, f, L]
@@ -304,15 +313,17 @@ fn eval(L, env) if type(L) {
 			makeFn(fn(args) eval(
 				body
 				{
-					fn sub(envc, params, args) if params {
-						? -> envc
-						_ -> {
-							if args { ? -> args <- [LispNull] }
-							setv(envc, params.0, args.0)
-							sub(envc, params.1, args.1)
+					envc := { '\x00env': env }
+					fn setScope(param, arg) if type(param) {
+						:atom -> setv(envc, param, arg)
+						:list -> {
+							if arg { ? -> arg <- [] }
+							setScope(param.0, arg.0)
+							setScope(param.1, arg.1)
 						}
 					}
-					sub({ '-env': env }, params, args)
+					setScope(params, args)
+					envc
 				}
 			), L)
 		}
@@ -325,15 +336,17 @@ fn eval(L, env) if type(L) {
 			makeMacro(fn(args) eval(
 				body
 				{
-					fn sub(envc, params, args) if params {
-						? -> envc
-						_ -> {
-							if args { ? -> args <- [LispNull] }
-							setv(envc, params.0, args.0)
-							sub(envc, params.1, args.1)
+					envc := { '\x00env': env }
+					fn setScope(param, arg) if type(param) {
+						:atom -> setv(envc, param, arg)
+						:list -> {
+							if arg { ? -> arg <- [] }
+							setScope(param.0, arg.0)
+							setScope(param.1, arg.1)
 						}
 					}
-					sub({ '-env': env }, params, [args, ?])
+					setScope(params, args)
+					envc
 				}
 			), L)
 		}
@@ -356,22 +369,14 @@ fn eval(L, env) if type(L) {
 			if impl.(1).(1).1 != ? -> impl.(1).(1).0
 		}
 		_ -> {
-			argcs := L.1
 			funcStub := eval(L.0, env)
 			func := eval(funcStub.1, env)
+			argcs := L.1
 
 			// funcStub.0 reports whether the stub is a macro
 			if funcStub.0 {
 				true -> func(argcs) |> eval(env)
-				_ -> {
-					args := [?]
-					argcs |> with reduceSexpr(args) fn(head, x) {
-						cons := [eval(x, env)]
-						head.1 := cons
-						cons
-					}
-					func(args.1)
-				}
+				_ -> func(argcs |> mapSexpr(fn(x) eval(x, env)))
 			}
 		}
 	}

@@ -15,7 +15,7 @@
      (fn (x)
          (if x false true)))
 (def &
-     (macro (terms)
+     (macro terms
             (if (= terms ())
               ,true
               (cons ,if
@@ -24,7 +24,7 @@
                                 (cons ,false ())))))))
 
 (def |
-     (macro (terms)
+     (macro terms
             (if (= terms ())
               ,false
               (cons ,if
@@ -33,7 +33,7 @@
                                 (cons (cons ,| (cdr terms))
                                       ())))))))
 (def ^
-     (macro (terms)
+     (macro terms
             (cons ,!
                   (cons (cons ,= terms)
                         ()))))
@@ -102,9 +102,7 @@
            n)))
 (def sign
      (fn (n)
-         (if (neg? n)
-           (neg 1)
-           1)))
+         (if (neg? n) -1 1)))
 (def sqrt
      (fn (n) (# n 0.5)))
 (def even?

@@ -1,6 +1,6 @@
 ; utilities for writing tests
 
-(defmacro run-tests (terms)
+(defmacro run-tests terms
   (quasiquote
     (let
       (results (unquote (cons ,list terms)))
@@ -25,7 +25,7 @@
                     (->string (size results)))
                  'tests passed.')))))
 
-(defmacro test (terms)
+(defmacro test terms
   (do
     (def name (car terms))
     (def expected (cadr terms))
