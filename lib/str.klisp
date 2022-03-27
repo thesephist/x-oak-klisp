@@ -196,6 +196,6 @@
 
 (defn trim (s part)
   (-> s
-    (trim-start part)
-    (trim-end part)))
+      (trim-start part)
+      (trim-end part)))
 

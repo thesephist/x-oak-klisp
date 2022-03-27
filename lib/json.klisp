@@ -1,8 +1,11 @@
 ; json library support for encoding/decoding JSON
 
 (defn json/serialize (x)
+  'serialize a value `x` to a string'
   ())
 
 (defn json/parse (s)
+  'parse out a value from the string `s`. Returns the symbol "error" instead on
+  any syntax errors.'
   ())
 

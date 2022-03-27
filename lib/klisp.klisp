@@ -89,6 +89,8 @@
 ; basic math
 (def neg
   (fn (n) (- 0 n)))
+(def pos?
+  (fn (n) (> n 0)))
 (def neg?
   (fn (n) (< n 0)))
 (def not-neg?
@@ -123,11 +125,18 @@
   (fn (start end step)
     (do
       (def -range
-        (fn (start end step)
-          (if (< start end)
-            (cons start
-                  (-range (+ start step) end step))
-            ())))
+        (if (| (nil? step)
+               (pos? step))
+          (fn (start end step)
+            (if (< start end)
+              (cons start
+                    (-range (+ start step) end step))
+              ()))
+          (fn (start end step)
+            (if (> start end)
+              (cons start
+                    (-range (+ start step) end step))
+              ()))))
       (if (nil? step)
         (if (nil? end)
           (-range 0 start 1)

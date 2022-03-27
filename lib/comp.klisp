@@ -1,4 +1,4 @@
-; composites: persistent immutable associative array
+; composites: persistent immutable associative arrays
 
 (defmacro comp terms
   'comps store key-value pairs in a list as
