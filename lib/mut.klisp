@@ -1,0 +1,12 @@
+; mut: mutable storage of data
+
+(defmacro defmut (name val)
+  (quasiquote
+    (def (unquote name) (cons (unquote val) ()))))
+
+(defn getm (mut)
+  (car mut))
+
+(defn setm! (mut val)
+  (car! mut val))
+

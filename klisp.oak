@@ -600,6 +600,7 @@ fn loadStdlib(withEnv) loadLibSources([
 	'{{ lib/json }}'
 	'{{ lib/random }}'
 	'{{ lib/comp }}'
+	'{{ lib/mut }}'
 	'{{ lib/test }}'
 ], withEnv)
 
