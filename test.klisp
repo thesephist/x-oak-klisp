@@ -1,74 +1,74 @@
 ; behavior test suite using the "test" library
 
 (run-tests
-  (test 'basic addition'
-        4
-        (+ 2 2))
-  (test 'basic subtraction'
-        5
-        (- 10 5))
+  (deftest 'basic addition'
+    4
+    (+ 2 2))
+  (deftest 'basic subtraction'
+    5
+    (- 10 5))
 
-  (test 'base-iterator list'
-        ()
-        (base-iterator (list 1 2 3)))
-  (test 'base-iterator string'
-        ''
-        (base-iterator 'hello'))
+  (deftest 'base-iterator list'
+    ()
+    (base-iterator (list 1 2 3)))
+  (deftest 'base-iterator string'
+    ''
+    (base-iterator 'hello'))
 
-  (test 'first empty list'
-        ()
-        (first ()))
-  (test 'first list'
-        10
-        (first (list 10 20 30)))
-  (test 'first empty string'
-        ''
-        (first ''))
-  (test 'first string'
-        'L'
-        (first 'Lisp'))
+  (deftest 'first empty list'
+    ()
+    (first ()))
+  (deftest 'first list'
+    10
+    (first (list 10 20 30)))
+  (deftest 'first empty string'
+    ''
+    (first ''))
+  (deftest 'first string'
+    'L'
+    (first 'Lisp'))
 
-  (test 'rest empty list'
-        ()
-        (rest ()))
-  (test 'rest list'
-        (list 20 30)
-        (rest (list 10 20 30)))
-  (test 'rest empty string'
-        ''
-        (rest ''))
-  (test 'rest string'
-        'isp'
-        (rest 'Lisp'))
+  (deftest 'rest empty list'
+    ()
+    (rest ()))
+  (deftest 'rest list'
+    (list 20 30)
+    (rest (list 10 20 30)))
+  (deftest 'rest empty string'
+    ''
+    (rest ''))
+  (deftest 'rest string'
+    'isp'
+    (rest 'Lisp'))
 
-  (test 'conj onto string'
-        'Lisp'
-        (conj 'L' 'isp'))
-  (test 'conj onto list'
-        (list 10 20 30 40)
-        (conj 10 (list 20 30 40)))
+  (deftest 'conj onto string'
+    'Lisp'
+    (conj 'L' 'isp'))
+  (deftest 'conj onto list'
+    (list 10 20 30 40)
+    (conj 10 (list 20 30 40)))
 
-  (test 'nth of string'
-        'p'
-        (nth 'Apple' 2))
-  (test 'nth of string, too low'
-        ''
-        (nth 'Apple' -2))
-  (test 'nth of string, too high'
-        ''
-        (nth 'Apple' 10))
-  (test 'nth of list'
-        3
-        (nth (nat 5) 2))
-  (test 'nth of list, too low'
-        ()
-        (nth (nat 5) -2))
-  (test 'nth of list, too high'
-        ()
-        (nth (nat 5) 10))
+  (deftest 'nth of string'
+    'p'
+    (nth 'Apple' 2))
+  (deftest 'nth of string, too low'
+    ''
+    (nth 'Apple' -2))
+  (deftest 'nth of string, too high'
+    ''
+    (nth 'Apple' 10))
+  (deftest 'nth of list'
+    3
+    (nth (nat 5) 2))
+  (deftest 'nth of list, too low'
+    ()
+    (nth (nat 5) -2))
+  (deftest 'nth of list, too high'
+    ()
+    (nth (nat 5) 10))
 
-  (test 'nth! of string'
-        'ApXle'
+  (deftest 'nth! of string'
+    'ApXle'
         (let (s 'Apple')
           (do
             (nth! s 2 'X')

@@ -1,140 +1,140 @@
 ; math library
 
 (def pi
-     3.14159265358979323846264338327950288419716939937510)
+  3.14159265358979323846264338327950288419716939937510)
 
 (def e
-     2.71828182845904523536028747135266249775724709369995)
+  2.71828182845904523536028747135266249775724709369995)
 
 (defn sq (n)
-      (* n n))
+  (* n n))
 
 (defn hypot (x0 y0 x1 y1)
-      (do
-        (default x1 0)
-        (default y1 0)
-        (sqrt (+ (sq (- x0 x1))
-                 (sq (- y0 y1))))))
+  (do
+    (default x1 0)
+    (default y1 0)
+    (sqrt (+ (sq (- x0 x1))
+             (sq (- y0 y1))))))
 
 (defn scale (x a b c d)
-      (let (normed (/ (- x a) (- b a)))
-        (if (& (nil? c) (nil? d))
-          normed
-          (+ c
-             (* normed (- d c))))))
+  (let (normed (/ (- x a) (- b a)))
+    (if (& (nil? c) (nil? d))
+      normed
+      (+ c
+         (* normed (- d c))))))
 
 (defn clamp (x a b)
-      (cond ((< x a) a)
-            ((> x b) b)
-            (x)))
+  (cond ((< x a) a)
+        ((> x b) b)
+        (x)))
 
 (defn round (n decimals)
-      (do
-        (default decimals 0)
-        (if (< decimals 0)
-          n
-          (let (order (# 10 decimals))
-            (if (>= n 0)
-              (/ (int (+ (* n order) 0.5)) order)
-              (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
+  (do
+    (default decimals 0)
+    (if (< decimals 0)
+      n
+      (let (order (# 10 decimals))
+        (if (>= n 0)
+          (/ (int (+ (* n order) 0.5)) order)
+          (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
 
 (defn even? (n)
-      (zero? (% n 2)))
+  (zero? (% n 2)))
 
 (defn odd? (n)
-      (= (% n 2) 1))
+  (= (% n 2) 1))
 
 ; Euclid's GCD algorithm
 (defn gcd (a b)
-      ; prereq: a < b
-      (do
-        (defn sub (a b)
-              (if (zero? a)
-                b
-                (sub (% b a) a)))
-        (def a (abs a))
-        (def b (abs b))
-        (if (> a b)
-          (sub b a)
-          (sub a b))))
+  ; prereq: a < b
+  (do
+    (defn sub (a b)
+      (if (zero? a)
+        b
+        (sub (% b a) a)))
+    (def a (abs a))
+    (def b (abs b))
+    (if (> a b)
+      (sub b a)
+      (sub a b))))
 
 ; LCM using GCD
 (defn lcm (a b)
-      (* a (/ b (gcd a b))))
+  (* a (/ b (gcd a b))))
 
 (defn factor? (n c)
-      (zero? (% n c)))
+  (zero? (% n c)))
 
 ; prime filter
 (defn prime? (n)
-      (if (< n 2)
-        false
-        (do
-          (def max (inc (int (sqrt n))))
-          (defn sub (i)
-                (if (= i max)
-                  true
-                  (if (factor? n i)
-                    false
-                    (sub (inc i)))))
-          (sub 2))))
+  (if (< n 2)
+    false
+    (do
+      (def max (inc (int (sqrt n))))
+      (defn sub (i)
+        (if (= i max)
+          true
+          (if (factor? n i)
+            false
+            (sub (inc i)))))
+      (sub 2))))
 
 ; prime factorize natural number
 (defn prime-factors (n)
-      (do
-        (defn sub (pfs m pf)
-              (if (= m 1)
-                pfs
-                (if (factor? m pf)
-                  (sub (cons pf pfs)
-                       (/ m pf)
-                       pf)
-                  (sub pfs
-                       m
-                       (inc pf)))))
-        (reverse (sub () n 2))))
+  (do
+    (defn sub (pfs m pf)
+      (if (= m 1)
+        pfs
+        (if (factor? m pf)
+          (sub (cons pf pfs)
+               (/ m pf)
+               pf)
+          (sub pfs
+               m
+               (inc pf)))))
+    (reverse (sub () n 2))))
 
 ; naive factorize
 (defn factors (n)
-      (let (first-half (-> (nat (int (sqrt n)))
-                           (filter (partial factor? n ?))))
-        (cond
-          ((nil? first-half) first-half)
-          ((nil? (cdr first-half)) first-half)
-          ((append first-half
-                   (let (rev-first-half (reverse first-half))
-                     (if (= (car rev-first-half)
-                            (/ n (car rev-first-half)))
-                       (cdr (map rev-first-half (partial / n ?)))
-                       (map rev-first-half (partial / n ?)))))))))
+  (let (first-half (-> (nat (int (sqrt n)))
+                     (filter (partial factor? n ?))))
+    (cond
+      ((nil? first-half) first-half)
+      ((nil? (cdr first-half)) first-half)
+      ((append first-half
+               (let (rev-first-half (reverse first-half))
+                 (if (= (car rev-first-half)
+                        (/ n (car rev-first-half)))
+                   (cdr (map rev-first-half (partial / n ?)))
+                   (map rev-first-half (partial / n ?)))))))))
 
 (def sum
-     (fn (ns) (reduce ns 0 +)))
+  (fn (ns) (reduce ns 0 +)))
 
 (def prod
-     (fn (ns) (reduce ns 1 *)))
+  (fn (ns) (reduce ns 1 *)))
 
 (defn mean (xs)
-      (/ (sum xs) (size xs)))
+  (/ (sum xs) (size xs)))
 
 (defn geomean (xs)
-      (# (prod xs) (/ 1 (size xs))))
+  (# (prod xs) (/ 1 (size xs))))
 
 (def min
-     (fn (xs)
-         (if (nil? xs)
-           ()
-           (reduce xs
-                   (car xs)
-                   (fn (a b)
-                       (if (< a b) a b))))))
+  (fn (xs)
+    (if (nil? xs)
+      ()
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) a b))))))
 
 (def max
-     (fn (xs)
-         (if (nil? xs)
-           ()
-           (reduce xs
-                   (car xs)
-                   (fn (a b)
-                       (if (< a b) b a))))))
+  (fn (xs)
+    (if (nil? xs)
+      ()
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) b a))))))
 

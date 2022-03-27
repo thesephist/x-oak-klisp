@@ -2,29 +2,29 @@
 ; with pseudorandom sources of randomness
 
 (defn rand-bool ()
-      'returns a random bool with equal chance'
-      (< (rand) 0.5))
+  'returns a random bool with equal chance'
+  (< (rand) 0.5))
 
 (defn rand-int (min max)
-      'returns a random integer in the range [min, max). If only a
-      single number is given as the argument, the range is assumed
-      to be [0, max) instead.'
-      (int (rand-number (int min)
-                        (int max))))
+  'returns a random integer in the range [min, max). If only a
+  single number is given as the argument, the range is assumed
+  to be [0, max) instead.'
+  (int (rand-number (int min)
+                    (int max))))
 
 (defn rand-number (min max)
-      'returns a random float in the range [min, max). If only a
-      single number is given as the argument, the range is assumed
-      to be [0, max) instead.'
+  'returns a random float in the range [min, max). If only a
+  single number is given as the argument, the range is assumed
+  to be [0, max) instead.'
+  (do
+    (when (nil? max)
       (do
-        (when (nil? max)
-          (do
-            (def max min)
-            (def min 0)))
-        (+ min
-           (* (rand) (- max min)))))
+        (def max min)
+        (def min 0)))
+    (+ min
+       (* (rand) (- max min)))))
 
 (defn rand-choice (xs)
-      'returns a randomly picked item from the list xs'
-      (nth xs (rand-int 0 (size xs))))
+  'returns a randomly picked item from the list xs'
+  (nth xs (rand-int 0 (size xs))))
 

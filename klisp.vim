@@ -13,6 +13,8 @@ syntax sync fromstart
 
 " lisp-style indentation
 set lisp
+set lispwords+=quote,def,do,if,fn,macro
+set lispwords+=def,defn,defmacro,defmut,deftest,when,unless,let,when-let,if-let,quasiquote,loop,while,match,partial
 
 " booleans
 syntax keyword klispBoolean true false
@@ -35,16 +37,25 @@ syntax match klispKeywordCadr "\v(car|cdr|first|rest)!?" contained
 syntax keyword klispKeyword cons contained
 syntax keyword klispKeyword conj contained
 " core library and control flow forms
-syntax keyword klispKeyword let contained
-syntax keyword klispKeyword when contained
-syntax keyword klispKeyword when-let contained
-syntax keyword klispKeyword unless contained
 syntax keyword klispKeyword defn contained
 syntax keyword klispKeyword defmacro contained
-syntax keyword klispKeyword cond contained
-syntax keyword klispKeyword match contained
+syntax keyword klispKeyword defmut contained
+syntax keyword klispKeyword deftest contained
+syntax keyword klispKeyword when contained
+syntax keyword klispKeyword unless contained
+syntax keyword klispKeyword let contained
+syntax keyword klispKeyword if-let contained
+syntax keyword klispKeyword when-let contained
+syntax keyword klispKeyword unless contained
 syntax keyword klispKeyword quasiquote contained
 syntax keyword klispKeyword unquote contained
+syntax keyword klispKeyword default contained
+syntax keyword klispKeyword loop contained
+syntax keyword klispKeyword break contained
+syntax keyword klispKeyword while contained
+syntax keyword klispKeyword cond contained
+syntax keyword klispKeyword match contained
+syntax keyword klispKeyword partial contained
 " type assertions
 syntax match klispKeywordTyContainer "\v\(\s*(nil|int|float|number|bool|\-\>string|symbol|function|list)\??[ ()$]" contains=klispKeywordTy
 syntax match klispKeywordTy "\vnil\?" contained

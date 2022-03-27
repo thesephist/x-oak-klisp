@@ -7,32 +7,28 @@
       (passed? cadr)
       (do
         (-> results
-            (exclude passed?)
-            (each (fn (r)
-                      (let
-                        (name (car r))
-                        (got (car (cddr r)))
-                        (expected (cadr (cddr r)))
-                        (println (+ name
-                                    ': expected '
-                                    (->string expected)
-                                    ', got '
-                                    (->string got)))))))
+          (exclude passed?)
+          (each (fn (r)
+                  (let
+                    (name (car r))
+                    (got (car (cddr r)))
+                    (expected (cadr (cddr r)))
+                    (println (+ name
+                                ': expected '
+                                (->string expected)
+                                ', got '
+                                (->string got)))))))
         (println (+ (->string (-> results
-                                  (filter passed?)
-                                  size))
+                                (filter passed?)
+                                size))
                     '/'
                     (->string (size results)))
                  'tests passed.')))))
 
-(defmacro test terms
-  (do
-    (def name (car terms))
-    (def expected (cadr terms))
-    (def body (car (cddr terms)))
-    (quasiquote
-      (let (got (unquote body))
-        (list (unquote name)
-              (= got (unquote expected)) ; result
-              got (unquote expected))))))
+(defmacro deftest (name expected body)
+  (quasiquote
+    (let (got (unquote body))
+      (list (unquote name)
+            (= got (unquote expected)) ; result
+            got (unquote expected)))))
 

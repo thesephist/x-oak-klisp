@@ -28,6 +28,15 @@ oakPrint := print
 // Oak list -> Klisp list
 fn listify(xs) xs |> reverse() |> reduce(?, fn(L, x) [x, L])
 
+// like std.map, but works on lisp lists
+fn mapSexpr(L, f) {
+	fn sub(mapped, rest) if rest {
+		? -> mapped
+		_ -> sub(mapped << f(rest.0), rest.1)
+	}
+	sub([], L) |> listify()
+}
+
 // like std.reduce, but works on lisp lists
 fn reduceSexpr(L, init, f) {
 	fn sub(acc, node) if node {
@@ -242,7 +251,7 @@ LispNull := fn {}
 LispEmpty := fn {}
 
 fn getv(env, name, err?) if v := env.(string(name)) {
-	? -> if e := env.'-env' {
+	? -> if e := env.'\x00env' {
 		? -> {
 			if err? -> println('Unbound name "' + string(name) + '"')
 			?
@@ -254,10 +263,10 @@ fn getv(env, name, err?) if v := env.(string(name)) {
 	_ -> v
 }
 
-fn setv(env, name, v) if type(v) {
-	:null -> env.(string(name)) := LispNull
-	:empty -> env.(string(name)) := LispEmpty
-	_ -> env.(string(name)) := v
+fn setv(env, name, v) env.(string(name)) := if type(v) {
+	:null -> LispNull
+	:empty -> LispEmpty
+	_ -> v
 }
 
 fn makeFn(f, L) [false, f, L]
@@ -304,15 +313,17 @@ fn eval(L, env) if type(L) {
 			makeFn(fn(args) eval(
 				body
 				{
-					fn sub(envc, params, args) if params {
-						? -> envc
-						_ -> {
-							if args { ? -> args <- [LispNull] }
-							setv(envc, params.0, args.0)
-							sub(envc, params.1, args.1)
+					envc := { '\x00env': env }
+					fn setScope(param, arg) if type(param) {
+						:atom -> setv(envc, param, arg)
+						:list -> {
+							if arg { ? -> arg <- [] }
+							setScope(param.0, arg.0)
+							setScope(param.1, arg.1)
 						}
 					}
-					sub({ '-env': env }, params, args)
+					setScope(params, args)
+					envc
 				}
 			), L)
 		}
@@ -325,15 +336,17 @@ fn eval(L, env) if type(L) {
 			makeMacro(fn(args) eval(
 				body
 				{
-					fn sub(envc, params, args) if params {
-						? -> envc
-						_ -> {
-							if args { ? -> args <- [LispNull] }
-							setv(envc, params.0, args.0)
-							sub(envc, params.1, args.1)
+					envc := { '\x00env': env }
+					fn setScope(param, arg) if type(param) {
+						:atom -> setv(envc, param, arg)
+						:list -> {
+							if arg { ? -> arg <- [] }
+							setScope(param.0, arg.0)
+							setScope(param.1, arg.1)
 						}
 					}
-					sub({ '-env': env }, params, [args, ?])
+					setScope(params, args)
+					envc
 				}
 			), L)
 		}
@@ -351,27 +364,15 @@ fn eval(L, env) if type(L) {
 				_ -> expr
 			}
 		}
-		:doc -> {
-			impl := eval(L.(1).0, env).2
-			if impl.(1).(1).1 != ? -> impl.(1).(1).0
-		}
 		_ -> {
-			argcs := L.1
 			funcStub := eval(L.0, env)
 			func := eval(funcStub.1, env)
+			argcs := L.1
 
 			// funcStub.0 reports whether the stub is a macro
 			if funcStub.0 {
 				true -> func(argcs) |> eval(env)
-				_ -> {
-					args := [?]
-					argcs |> with reduceSexpr(args) fn(head, x) {
-						cons := [eval(x, env)]
-						head.1 := cons
-						cons
-					}
-					func(args.1)
-				}
+				_ -> func(argcs |> mapSexpr(fn(x) eval(x, env)))
 			}
 		}
 	}
@@ -381,8 +382,11 @@ fn eval(L, env) if type(L) {
 }
 
 Env := {
+	// constants
 	'true': true
 	'false': false
+
+	// language primitives
 	'car': makeNative(fn(L) if L.0 != ? -> L.(0).0)
 	'cdr': makeNative(fn(L) if L.0 != ? -> L.(0).1)
 	'car!': makeNative(fn(L) L.(0).0 := L.(1).0)
@@ -408,6 +412,17 @@ Env := {
 		}
 		_ -> ''
 	})
+	'apply': makeNative(fn(L) {
+		funcStub := L.0
+		func := funcStub.1
+		args := L.(1).0
+		// can only apply a fn, not a macro
+		if !funcStub.0 -> func(args)
+	})
+	'doc': makeNative(fn(L) {
+		impl := L.(0).2
+		if impl.(1).(1).1 != ? -> impl.(1).(1).0
+	})
 
 	// ports of Oak's builtins
 	'char': makeNative(fn(L) char(int(L.0)))
@@ -419,6 +434,7 @@ Env := {
 	'float': makeNative(fn(L) float(L.0))
 	'rand': makeNative(rand)
 	'time': makeNative(time)
+	'nanotime': makeNative(nanotime)
 	'args': makeNative(fn(_) {
 		fn makeList(xs) if len(xs) {
 			0 -> ?
@@ -471,7 +487,10 @@ Env := {
 	'string->int': makeNative(fn(L) int(L.0) |> default(0))
 	'string->float': makeNative(fn(L) float(L.0) |> default(0))
 	'string->symbol': makeNative(fn(L) atom(L.0))
-	'->string': makeNative(fn(L) print(L.0))
+	'->string': makeNative(fn(L) if type(x := L.0) {
+		:string -> x
+		_ -> print(L.0)
+	})
 
 	// I/O, system
 	'print': makeNative(fn(L) {
@@ -576,1201 +595,1258 @@ fn loadStdlib(withEnv) loadLibSources([
 
 ; cons cell shorthands
 (def caar
-     (fn (x) (car (car x))))
+  (fn (x) (car (car x))))
 (def cadr
-     (fn (x) (car (cdr x))))
+  (fn (x) (car (cdr x))))
 (def cdar
-     (fn (x) (cdr (car x))))
+  (fn (x) (cdr (car x))))
 (def cddr
-     (fn (x) (cdr (cdr x))))
+  (fn (x) (cdr (cdr x))))
 
 ; lazy-evaluating boolean combinators
 (def !
-     (fn (x)
-         (if x false true)))
+  (fn (x)
+    (if x false true)))
 (def &
-     (macro (terms)
-            (if (= terms ())
-              ,true
-              (cons ,if
-                    (cons (car terms)
-                          (cons (cons ,& (cdr terms))
-                                (cons ,false ())))))))
+  (macro terms
+    (if (= terms ())
+      ,true
+      (cons ,if
+            (cons (car terms)
+                  (cons (cons ,& (cdr terms))
+                        (cons ,false ())))))))
 
 (def |
-     (macro (terms)
-            (if (= terms ())
-              ,false
-              (cons ,if
-                    (cons (car terms)
-                          (cons ,true
-                                (cons (cons ,| (cdr terms))
-                                      ())))))))
+  (macro terms
+    (if (= terms ())
+      ,false
+      (cons ,if
+            (cons (car terms)
+                  (cons ,true
+                        (cons (cons ,| (cdr terms))
+                              ())))))))
 (def ^
-     (macro (terms)
-            (cons ,!
-                  (cons (cons ,= terms)
-                        ()))))
+  (macro terms
+    (cons ,!
+          (cons (cons ,= terms)
+                ()))))
 (def <<
-     (fn (x y)
-         (if (= (type x) ,string)
-           (sets! x (len x) y)
-           ; O(n^2) behavior with linked lists
-           (do
-             (def -<<
-                  (fn (x)
-                      (if (= x ())
-                        (cons y ())
-                        (cons (car x)
-                              (-<< (cdr x) y)))))
-             (-<< x y)))))
+  (fn (x y)
+    (if (= (type x) ,string)
+      (sets! x (len x) y)
+      ; O(n^2) behavior with linked lists
+      (do
+        (def -<<
+          (fn (x)
+            (if (= x ())
+              (cons y ())
+              (cons (car x)
+                    (-<< (cdr x) y)))))
+        (-<< x y)))))
 (def != ^)
 
 ; type assertions
 (def nil?
-     (fn (x) (= x ())))
+  (fn (x) (= x ())))
 (def zero?
-     (fn (x) (= x 0)))
+  (fn (x) (= x 0)))
 (def int?
-     (fn (x) (= (type x) ,int)))
+  (fn (x) (= (type x) ,int)))
 (def float?
-     (fn (x) (= (type x) ,float)))
+  (fn (x) (= (type x) ,float)))
 (def number?
-     (fn (x) (| (int? x) (float? x))))
+  (fn (x) (| (int? x) (float? x))))
 (def bool?
-     (fn (x) (= (type x) ,bool)))
+  (fn (x) (= (type x) ,bool)))
 (def string?
-     (fn (x) (= (type x) ,string)))
+  (fn (x) (= (type x) ,string)))
 (def symbol?
-     (fn (x) (= (type x) ,symbol)))
+  (fn (x) (= (type x) ,symbol)))
 (def function?
-     (fn (x) (= (type x) ,function)))
+  (fn (x) (= (type x) ,function)))
 (def list?
-     (fn (x)
-         (| (= x ())
-            (= (type x) ,list))))
+  (fn (x)
+    (| (= x ())
+       (= (type x) ,list))))
 
 ; identity
 (def id
-     (fn (x) x))
+  (fn (x) x))
 (def is
-     (fn (x)
-         (fn (y) (= x y))))
+  (fn (x)
+    (fn (y) (= x y))))
+(def constantly
+  (fn (x)
+    (fn () x)))
 
 ; basic math
 (def neg
-     (fn (n) (- 0 n)))
+  (fn (n) (- 0 n)))
 (def neg?
-     (fn (n) (< n 0)))
+  (fn (n) (< n 0)))
 (def not-neg?
-     (fn (n) (>= n 0)))
+  (fn (n) (>= n 0)))
 (def not-pos?
-     (fn (n) (<= n 0)))
+  (fn (n) (<= n 0)))
 (def abs
-     (fn (n)
-         (if (neg? n)
-           (neg n)
-           n)))
+  (fn (n)
+    (if (neg? n)
+      (neg n)
+      n)))
 (def sign
-     (fn (n)
-         (if (neg? n)
-           (neg 1)
-           1)))
+  (fn (n)
+    (if (neg? n) -1 1)))
 (def sqrt
-     (fn (n) (# n 0.5)))
+  (fn (n) (# n 0.5)))
 (def even?
-     (fn (n) (zero? (% n 2))))
+  (fn (n) (zero? (% n 2))))
 (def odd?
-     (fn (n) (! (even? n))))
+  (fn (n) (! (even? n))))
 (def >=
-     (fn (a b) (! (< a b))))
+  (fn (a b) (! (< a b))))
 (def <=
-     (fn (a b) (! (> a b))))
+  (fn (a b) (! (> a b))))
 (def inc
-     (fn (n) (+ n 1)))
+  (fn (n) (+ n 1)))
 (def dec
-     (fn (n) (- n 1)))
+  (fn (n) (- n 1)))
 
 ; list methods
 (def range
-     (fn (start end step)
-         (do
-           (def -range
-                (fn (start end step)
-                    (if (< start end)
-                      (cons start
-                            (-range (+ start step) end step))
-                      ())))
-           (if (nil? step)
-             (if (nil? end)
-               (-range 0 start 1)
-               (-range start end 1))
-             (-range start end step)))))
+  (fn (start end step)
+    (do
+      (def -range
+        (fn (start end step)
+          (if (< start end)
+            (cons start
+                  (-range (+ start step) end step))
+            ())))
+      (if (nil? step)
+        (if (nil? end)
+          (-range 0 start 1)
+          (-range start end 1))
+        (-range start end step)))))
 
 (def nat
-     (fn (n) (range 1 (inc n))))
+  (fn (n) (range 1 (inc n))))
 
 '
 	'; core macros
 
 (def gensym
-     (fn ()
-         (-> (rand)
-             (* 100000000)
-             int
-             ->string
-             ((fn (s) (+ \'sym\' s)))
-             string->symbol)))
+  (fn ()
+    \'create a random, globally unique symbol\'
+    (-> (rand)
+        (* 100000000)
+        int
+        ->string
+        ((fn (s) (+ \'sym\' s)))
+        string->symbol)))
 
 (def map-list
-     (fn (xs f)
-         \'a map implementation used for implementing macros, not meant to be used
-         externally. For a supported "map" implementation, see map in lib/iter.\'
-         (if (nil? xs)
-           ()
-           (cons (f (car xs))
-                 (map-list (cdr xs) f)))))
+  (fn (xs f)
+    \'a map implementation used for implementing macros, not meant to be used
+    externally. For a supported "map" implementation, see map in lib/iter.\'
+    (if (nil? xs)
+      ()
+      (cons (f (car xs))
+            (map-list (cdr xs) f)))))
 
 (def when
-     (macro (terms)
-            (list ,if (car terms) (cadr terms) ())))
+  (macro (cndn body)
+    (list ,if cndn body ())))
 
 (def unless
-     (macro (terms)
-            (list ,if (car terms) () (cadr terms))))
+  (macro (cndn body)
+    (list ,if cndn () body)))
 
 (def let
-     (macro (terms)
-            (do
-              (defn make-let (decl body)
-                    (do
-                      (def declname (car decl))
-                      (def declval (cadr decl))
-                      (list
-                        (list ,fn (list declname) body)
-                        declval)))
-              (defn expand-let (terms)
-                    (make-let
-                      (car terms)
-                      (if (nil? (cddr terms))
-                        (cadr terms)
-                        (expand-let (cdr terms)))))
-              (expand-let terms))))
+  (macro terms
+    (do
+      (defn make-let ((declname declval) body)
+        (list
+          (list ,fn (list declname) body)
+          declval))
+      (defn expand-let (terms)
+        (make-let
+          (car terms)
+          (if (nil? (cddr terms))
+            (cadr terms)
+            (expand-let (cdr terms)))))
+      (expand-let terms))))
 
 (def when-let
-     (macro (terms)
-            (quasiquote
-              (let (unquote (car terms))
-                (unless (nil? (unquote (caar terms)))
-                  (unquote (cadr terms)))))))
+  (macro terms
+    (quasiquote
+      (let (unquote (car terms))
+        (unless (nil? (unquote (caar terms)))
+          (unquote (cadr terms)))))))
 
 (def if-let
-     (macro (terms)
-            (do
-              (def conddecl (car terms))
-              (def condname (car conddecl))
-              (def if-bodies (cdr terms))
-              (def if-conseq (car if-bodies))
-              (def if-altern (cadr if-bodies))
-              (quasiquote
-                (let (unquote conddecl)
-                  (if (! (nil? (unquote condname)))
-                    (unquote if-conseq)
-                    (unquote if-altern)))))))
+  (macro terms
+    (do
+      (def conddecl (car terms))
+      (def condname (car conddecl))
+      (def if-bodies (cdr terms))
+      (def if-conseq (car if-bodies))
+      (def if-altern (cadr if-bodies))
+      (quasiquote
+        (let (unquote conddecl)
+          (if (! (nil? (unquote condname)))
+            (unquote if-conseq)
+            (unquote if-altern)))))))
 
 (def list
-     (macro (items)
-            ((def -list
-                  (fn (items)
-                      (if (nil? items)
-                        ()
-                        (cons ,cons
-                              (cons (car items)
-                                    (cons (-list (cdr items))
-                                          ()))))))
-             items)))
+  (macro items
+    ((def -list
+       (fn (items)
+         (if (nil? items)
+           ()
+           (cons ,cons
+                 (cons (car items)
+                       (cons (-list (cdr items))
+                             ()))))))
+     items)))
 
 (def quasiquote
-     (macro (terms)
-            (cons
-              ,list
-              (map-list (car terms)
-                        (fn (term)
-                            (if (list? term)
-                              (if (= ,unquote (car term))
-                                (cadr term)
-                                (list ,quasiquote term))
-                              (list ,quote term)))))))
+  (macro terms
+    (cons
+      ,list
+      (map-list (car terms)
+                (fn (term)
+                  (if (list? term)
+                    (if (= ,unquote (car term))
+                      (cadr term)
+                      (list ,quasiquote term))
+                    (list ,quote term)))))))
 
 (def list-of
-     (macro (terms)
-            (let
-              (n (car terms))
-              (f (cadr terms))
-              (quasiquote
-                (-> (range (unquote n))
-                    (map-list (fn () (unquote f))))))))
+  (macro (n f)
+    (quasiquote
+      (-> (range (unquote n))
+          (map-list (fn () (unquote f)))))))
 
 (def do-times
-     (macro (terms)
-            (cons ,do
-                  (list-of (car terms) (list (cadr terms))))))
+  (macro terms
+    (cons ,do
+          (list-of (car terms) (list (cadr terms))))))
 
 (def default
-     (macro (terms)
-            \'(default name value)\'
-            (do
-              (def name (car terms))
-              (def val (cadr terms))
-              (quasiquote
-                (if (= (unquote name) ())
-                  (def (unquote name) (unquote val))
-                  ())))))
+  (macro (name val)
+    \'(default name value)\'
+    (quasiquote
+      (if (= (unquote name) ())
+        (def (unquote name) (unquote val))
+        ()))))
+
+(def loop
+  (macro (n body)
+    \'(loop body-with-break)\'
+    (do
+      (when (nil? body)
+        (do
+          (def body n)
+          (def n -1)))
+      (let (break-symb (gensym))
+        (quasiquote
+          (do
+            (def broken-with ,(()))
+            (defn loop-body (i break)
+              (if (| (= i (unquote n))
+                     (= (def ret (unquote body))
+                        (quote (unquote break-symb))))
+                (car broken-with)
+                (loop-body (inc i) break)))
+            (loop-body 0 (fn (ret)
+                           (do
+                             (car! broken-with ret)
+                             (quote (unquote break-symb)))))))))))
 
 (def while
-     (macro (terms)
-            \'(while condition . body)\'
-            (do
-              (def cndn (car terms))
-              (def body (cdr terms))
-              (def -while-f (gensym))
-              (quasiquote
-                ((def (unquote -while-f)
-                      (fn ()
-                          (if (unquote cndn)
-                            (do
-                              (unquote (cons ,do body))
-                              ((unquote -while-f)))
-                            ()))))))))
+  (macro (cndn . body)
+    \'(while condition . body)\'
+    (do
+      (def -while-f (gensym))
+      (quasiquote
+        ((def (unquote -while-f)
+           (fn ()
+             (if (unquote cndn)
+               (do
+                 (unquote (cons ,do body))
+                 ((unquote -while-f)))
+               ()))))))))
 
 (def defn
-     (macro (terms)
-            (quasiquote
-              (def (unquote (car terms))
-                   (unquote (cons (quote fn)
-                                  (cdr terms)))))))
+  (macro (name . rest)
+    (quasiquote
+      (def (unquote name)
+        (unquote (cons (quote fn) rest))))))
 
 (def defmacro
-     (macro (terms)
-            (quasiquote
-              (def (unquote (car terms))
-                   (unquote (cons (quote macro)
-                                  (cdr terms)))))))
+  (macro (name . rest)
+    (quasiquote
+      (def (unquote name)
+        (unquote (cons (quote macro) rest))))))
 
 (def cond
-     (macro (terms)
-            \'(cond (pred body) (pred body) (default-body))\'
-            ((def -cond
-                  (fn (terms)
-                      (if (nil? terms)
-                        ()
-                        (if (nil? (cdar terms))
-                          (caar terms)
-                          (quasiquote
-                            (if (unquote (car (car terms)))
-                              (unquote (cadr (car terms)))
-                              (unquote (-cond (cdr terms)))))))))
-             terms)))
+  (macro terms
+    \'(cond (pred body) (pred body) (default-body))\'
+    ((def -cond
+       (fn (terms)
+         (if (nil? terms)
+           ()
+           (if (nil? (cdar terms))
+             (caar terms)
+             (quasiquote
+               (if (unquote (car (car terms)))
+                 (unquote (cadr (car terms)))
+                 (unquote (-cond (cdr terms)))))))))
+     terms)))
+
+(def cond-by
+  (macro (pred name . branches)
+    \'(cond-by pred value (target body) (target body) (default-body))\'
+    (do
+      (defn make-branch (br)
+        (if (nil? (cdr br))
+          br
+          (let (target (car br))
+            (body (cadr br))
+            (list (list pred name target)
+                  body))))
+      (cons ,cond
+            (map-list branches make-branch)))))
 
 (def match
-     (macro (terms)
-            \'(match val (tag body) (tag body) (default-body))\'
-            (do
-              (def -match-val (gensym))
-              (def -match
-                   (fn (terms)
-                       (if (nil? terms)
-                         ()
-                         (if (nil? (cdar terms))
-                           (caar terms)
-                           (quasiquote
-                             (if (= (unquote -match-val) (unquote (car (car terms))))
-                               (unquote (cadr (car terms)))
-                               (unquote (-match (cdr terms)))))))))
+  (macro terms
+    \'(match val (tag body) (tag body) (default-body))\'
+    (do
+      (def -match-val (gensym))
+      (def -match
+        (fn (terms)
+          (if (nil? terms)
+            ()
+            (if (nil? (cdar terms))
+              (caar terms)
               (quasiquote
-                (let ((unquote -match-val) (unquote (car terms)))
-                  (unquote (-match (cdr terms))))))))
+                (if (= (unquote -match-val) (unquote (car (car terms))))
+                  (unquote (cadr (car terms)))
+                  (unquote (-match (cdr terms)))))))))
+      (quasiquote
+        (let ((unquote -match-val) (unquote (car terms)))
+          (unquote (-match (cdr terms))))))))
 
 (def ->
-     (macro (terms)
-            \'thread-first\'
-            (do
-              (def apply-partials
-                   (fn (partials expr)
-                       (if (nil? partials)
-                         expr
-                         (if (symbol? (car partials))
-                           (list (car partials)
-                                 (apply-partials (cdr partials) expr))
-                           (cons (caar partials)
-                                 (cons (apply-partials (cdr partials) expr)
-                                       (cdar partials)))))))
-              (apply-partials (reverse (cdr terms))
-                              (car terms)))))
+  (macro terms
+    \'thread-first\'
+    (do
+      (def apply-partials
+        (fn (partials expr)
+          (if (nil? partials)
+            expr
+            (if (symbol? (car partials))
+              (list (car partials)
+                    (apply-partials (cdr partials) expr))
+              (cons (caar partials)
+                    (cons (apply-partials (cdr partials) expr)
+                          (cdar partials)))))))
+      (apply-partials (reverse (cdr terms))
+                      (car terms)))))
 
 (def ->>
-     (macro (terms)
-            \'thread-last\'
-            (do
-              (def apply-partials
-                   (fn (partials expr)
-                       (if (nil? partials)
-                         expr
-                         (if (symbol? (car partials))
-                           (list (car partials)
-                                 (apply-partials (cdr partials) expr))
-                           (<< (car partials)
-                               (apply-partials (cdr partials) expr))))))
-              (apply-partials (reverse (cdr terms))
-                              (car terms)))))
+  (macro terms
+    \'thread-last\'
+    (do
+      (def apply-partials
+        (fn (partials expr)
+          (if (nil? partials)
+            expr
+            (if (symbol? (car partials))
+              (list (car partials)
+                    (apply-partials (cdr partials) expr))
+              (<< (car partials)
+                  (apply-partials (cdr partials) expr))))))
+      (apply-partials (reverse (cdr terms))
+                      (car terms)))))
+
+(def as->
+  (macro (name val . partials)
+    \'thread-as: (as-> n 10 (double n) (sq (+ 10 n) 2))\'
+    (do
+      (defn replace-name (expr partial)
+        (if (list? partial)
+          (map-list partial
+                    (fn (x)
+                      (if (= x name)
+                        expr
+                        (replace-name expr x))))
+          partial))
+      (defn replace-partials (expr partials)
+        (if (nil? partials)
+          expr
+          (replace-partials (replace-name expr (car partials))
+                            (cdr partials))))
+      (replace-partials val partials))))
 
 (def partial
-     (macro (terms)
-            \'partial application\'
-            (let (partial-arg (gensym))
-              (list ,fn
-                    (list partial-arg)
-                    (do
-                      (defn -replace-partial-arg (expr)
-                            (if (list? expr)
-                              (map-list expr -replace-partial-arg)
-                              (if (= expr ,?)
-                                partial-arg
-                                expr)))
-                      (-replace-partial-arg (car terms)))))))
+  (macro terms
+    \'partial application\'
+    (let (partial-arg (gensym))
+      (list ,fn
+            (list partial-arg)
+            (do
+              (defn -replace-partial-arg (expr)
+                (if (list? expr)
+                  (map-list expr -replace-partial-arg)
+                  (if (= expr ,?)
+                    partial-arg
+                    expr)))
+              (-replace-partial-arg terms))))))
 
 (def macroexpand
-     (macro (terms)
-            \'macro expansion functions and macros\'
-            (quasiquote (expand (quote (unquote (car terms)))))))
+  (macro terms
+    \'macro expansion functions and macros\'
+    (quasiquote (expand (quote (unquote (car terms)))))))
 
 (def expand-all
-     (fn (expr)
-         (if (list? expr)
-           (let (expanded (expand expr))
-             (if (list? expanded)
-               (if (= expr expanded)
-                 (map-list expanded expand-all)
-                 (expand-all expanded))
-               expanded))
-           expr)))
+  (fn (expr)
+    (if (list? expr)
+      (let (expanded (expand expr))
+        (if (list? expanded)
+          (if (= expr expanded)
+            (map-list expanded expand-all)
+            (expand-all expanded))
+          expanded))
+      expr)))
 
 (def macroexpand-all
-     (macro (terms)
-            (quasiquote (expand-all (quote (unquote (car terms)))))))
+  (macro terms
+    (quasiquote (expand-all (quote (unquote (car terms)))))))
 
 ; utilities
 
 (def println
-     (macro (terms)
-            (cons ,do
-                  (cons (cons ,print terms)
-                        (cons ,(print (char 10))
-                              ())))))
+  (macro terms
+    (cons ,do
+          (cons (cons ,print terms)
+                (cons ,(print \'\\n\')
+                      ())))))
 
 (def comment
-     (macro (terms)
-            \'add "(comment val)" to an expr head to substitute the expr with "val"\'
-            (car terms)))
+  (macro terms
+    \'add "(comment val)" to an expr head to substitute the expr with "val"\'
+    (car terms)))
 
 (def log-runtime
-     (macro (terms)
-            \'prints runtime (finish - start) of an expression
-            usage: (log-runtime label (do something))\'
-            (let (-val (gensym))
-              (quasiquote
-                (do
-                  (def start (time))
-                  (def (unquote -val) (unquote (cadr terms)))
-                  (println (+ \'Runtime for \' (unquote (car terms)) \':\')
-                           (->string (* 1000 (- (time) start)))
-                           \'ms\')
-                  (unquote -val))))))
+  (macro terms
+    \'prints runtime (finish - start) of an expression
+    usage: (log-runtime label (do something))\'
+    (let (-val (gensym))
+      (quasiquote
+        (do
+          (def start (time))
+          (def (unquote -val) (unquote (cadr terms)))
+          (println (+ \'Runtime for \' (unquote (car terms)) \':\')
+                   (->string (* 1000 (- (time) start)))
+                   \'ms\')
+          (unquote -val))))))
 
 '
 	'; iterator and sequence functions
 
 (defn base-iterator (seq)
-      (if (list? seq) () \'\'))
+  (if (list? seq) () \'\'))
 
 (defn empty? (seq)
-      (= seq (base-iterator seq)))
+  (= seq (base-iterator seq)))
 
 (defn first (seq)
-      (if (list? seq)
-        (car seq)
-        (gets seq 0 1)))
+  (if (list? seq)
+    (car seq)
+    (gets seq 0 1)))
 
 (defn first! (seq x)
-      (if (list? seq)
-        (car! seq x)
-        (sets! seq 0 x)))
+  (if (list? seq)
+    (car! seq x)
+    (sets! seq 0 x)))
 
 (defn rest (seq)
-      (if (list? seq)
-        (cdr seq)
-        (gets seq 1)))
+  (if (list? seq)
+    (cdr seq)
+    (gets seq 1)))
 
 (defn rest! (seq xs)
-      (if (list? seq)
-        (cdr! seq xs)
-        (sets! seq 1 xs)))
+  (if (list? seq)
+    (cdr! seq xs)
+    (sets! seq 1 xs)))
 
 (defn conj (x seq)
-      (if (list? seq)
-        (cons x seq)
-        (+ x seq)))
+  (if (list? seq)
+    (cons x seq)
+    (+ x seq)))
 
 ; generic iterator implementations
 
 (defn nth (xs i)
-      (if (not-pos? i)
-        (if (zero? i)
-          (first xs)
-          (base-iterator xs))
-        (nth (rest xs) (dec i))))
+  (if (not-pos? i)
+    (if (zero? i)
+      (first xs)
+      (base-iterator xs))
+    (nth (rest xs) (dec i))))
 
 (defn nth! (xs i x)
-      (if (list? xs)
-        (if (not-pos? i)
-          (first! xs x)
-          (nth! (rest xs) (dec i) x))
-        (sets! xs i (char-at x 0))))
+  (if (list? xs)
+    (if (not-pos? i)
+      (first! xs x)
+      (nth! (rest xs) (dec i) x))
+    (sets! xs i (char-at x 0))))
 
 (defn second (xs)
-      (nth xs 2))
+  (nth xs 2))
 
 (defn last (xs)
-      (if (empty? xs)
-        xs
-        (if (empty? (rest xs))
-          (first xs)
-          (last (rest xs)))))
+  (if (empty? xs)
+    xs
+    (if (empty? (rest xs))
+      (first xs)
+      (last (rest xs)))))
 
 (defn index (xs x)
-      (do
-        (defn index-from (xs x i)
-              (if (empty? xs)
-                -1
-                (if (= (first xs) x)
-                  i
-                  (index-from (rest xs) x (inc i)))))
-        (index-from xs x 0)))
+  (do
+    (defn index-from (xs x i)
+      (if (empty? xs)
+        -1
+        (if (= (first xs) x)
+          i
+          (index-from (rest xs) x (inc i)))))
+    (index-from xs x 0)))
 
 (defn contains? (xs x)
-      (<= 0 (index xs x)))
+  (<= 0 (index xs x)))
 
 (defn find (xs f?)
-      (do
-        (defn find-from (xs f? i)
-              (if (empty? xs)
-                -1
-                (if (f? (first xs))
-                  i
-                  (find-from (rest xs) f? (inc i)))))
-        (find-from xs f? 0)))
+  (do
+    (defn find-from (xs f? i)
+      (if (empty? xs)
+        -1
+        (if (f? (first xs))
+          i
+          (find-from (rest xs) f? (inc i)))))
+    (find-from xs f? 0)))
 
 (defn some? (xs f?)
-      (do
-        (default f? id)
-        (if (empty? xs)
-          false
-          (if (f? (first xs))
-            true
-            (some (rest xs) f?)))))
+  (do
+    (default f? id)
+    (if (empty? xs)
+      false
+      (if (f? (first xs))
+        true
+        (some (rest xs) f?)))))
 
 (defn every? (xs f?)
-      (do
-        (default f? id)
-        (if (empty? xs)
-          true
-          (if (f? (first xs))
-            (every? (rest xs) f?)
-            false))))
+  (do
+    (default f? id)
+    (if (empty? xs)
+      true
+      (if (f? (first xs))
+        (every? (rest xs) f?)
+        false))))
 
 (defn append (xs ys)
-      (if (empty? xs)
-        ys
-        (conj (first xs)
-              (append (rest xs) ys))))
+  (if (empty? xs)
+    ys
+    (conj (first xs)
+          (append (rest xs) ys))))
 
 (defn reverse (xs)
-      (do
-        (defn -reverse (acc xs)
-              (if (empty? xs)
-                acc
-                (-reverse (conj (first xs)
-                                acc)
-                          (rest xs))))
-        (-reverse (base-iterator xs) xs)))
-
-(defn map (xs f)
-      (if (empty? xs)
-        xs
-        (conj (f (first xs))
-              (map (rest xs) f))))
-
-(defn reduce (xs acc f)
+  (do
+    (defn -reverse (acc xs)
       (if (empty? xs)
         acc
-        (reduce (rest xs)
-                (f acc (first xs))
-                f)))
+        (-reverse (conj (first xs)
+                        acc)
+                  (rest xs))))
+    (-reverse (base-iterator xs) xs)))
+
+(defn map (xs f)
+  (if (empty? xs)
+    xs
+    (conj (f (first xs))
+          (map (rest xs) f))))
+
+(defn reduce (xs acc f)
+  (if (empty? xs)
+    acc
+    (reduce (rest xs)
+            (f acc (first xs))
+            f)))
 
 (defn filter (xs f?)
-      (if (empty? xs)
-        xs
-        (if (f? (first xs))
-          (conj (first xs)
-                (filter (rest xs) f?))
-          (filter (rest xs) f?))))
+  (if (empty? xs)
+    xs
+    (if (f? (first xs))
+      (conj (first xs)
+            (filter (rest xs) f?))
+      (filter (rest xs) f?))))
 
 (defn exclude (xs f?)
-      (if (empty? xs)
-        xs
-        (if (f? (first xs))
-          (exclude (rest xs) f?)
-          (conj (first xs)
-                (exclude (rest xs) f?)))))
+  (if (empty? xs)
+    xs
+    (if (f? (first xs))
+      (exclude (rest xs) f?)
+      (conj (first xs)
+            (exclude (rest xs) f?)))))
 
 (defn each (xs f)
-      (unless (empty? xs)
-        (do
-          (f (first xs))
-          (each (rest xs) f))))
+  (unless (empty? xs)
+    (do
+      (f (first xs))
+      (each (rest xs) f))))
 
 (defn size (xs)
-      (if (list? xs)
-        (reduce xs 0 inc)
-        (len xs)))
+  (if (list? xs)
+    (reduce xs 0 inc)
+    (len xs)))
 
 (defn zip (xs ys f)
-      (do
-        (default f (if (list? xs) list +))
-        (if (| (empty? xs) (empty? ys))
-          ()
-          (cons (f (first xs) (first ys))
-                (zip (rest xs) (rest ys) f)))))
+  (do
+    (default f (if (list? xs) list +))
+    (if (| (empty? xs) (empty? ys))
+      ()
+      (cons (f (first xs) (first ys))
+            (zip (rest xs) (rest ys) f)))))
 
 (defn take (xs n)
-      (if (| (empty? xs) (zero? n))
-        (base-iterator xs)
-        (conj (first xs)
-              (take (rest xs) (dec n)))))
+  (if (| (empty? xs) (zero? n))
+    (base-iterator xs)
+    (conj (first xs)
+          (take (rest xs) (dec n)))))
 
 (defn take-while (xs f?)
-      (if (empty? xs)
-        xs
-        (if (f? (first xs))
-          (conj (first xs)
-                (take-while (rest xs) f?))
-          (base-iterator xs))))
+  (if (empty? xs)
+    xs
+    (if (f? (first xs))
+      (conj (first xs)
+            (take-while (rest xs) f?))
+      (base-iterator xs))))
 
 (defn drop (xs n)
-      (if (| (empty? xs) (zero? n))
-        xs
-        (drop (rest xs) (dec n))))
+  (if (| (empty? xs) (zero? n))
+    xs
+    (drop (rest xs) (dec n))))
 
 (defn drop-while (xs f?)
-      (if (empty? xs)
-        xs
-        (if (f? (first xs))
-          (drop-while (rest xs) f?)
-          xs)))
+  (if (empty? xs)
+    xs
+    (if (f? (first xs))
+      (drop-while (rest xs) f?)
+      xs)))
 
 (defn slice (xs start end)
-      (do
-        (default start 0)
-        (default end (size xs))
-        (-> xs
-            (drop start)
-            (take (- end start)))))
+  (do
+    (default start 0)
+    (default end (size xs))
+    (-> xs
+        (drop start)
+        (take (- end start)))))
 
 (defn flatten (xs)
-      (reduce xs () append))
+  (reduce xs () append))
 
 (defn compact (xs)
-      (exclude xs (is ())))
+  (exclude xs (is ())))
 
 (defn partition (xs by)
-      (match (type by)
-             (,nil (partition xs id))
-             (,int (do
-                     (defn -partition (xs n)
-                           (let (tail (drop xs n))
-                             (if (empty? tail)
-                               (list xs)
-                               (conj (take xs n)
-                                     (-partition tail n)))))
-                     (-partition xs (if (< by 1) 1 by))))
-             (,function (do
-                          (defn cut-by (xs f)
-                                (if (empty? xs)
-                                  (list () ())
-                                  (let (first-half (conj (first xs)
-                                                         (take-while (rest xs)
-                                                                     (let (f-of-first (f (first xs)))
-                                                                       (fn (x) (= (f x) f-of-first))))))
-                                    (list first-half
-                                          (drop xs (size first-half))))))
-                          (defn -partition (xs f)
-                                (if (empty? xs)
-                                  xs
-                                  (do
-                                    (def cut (cut-by xs f))
-                                    (def first-half (car cut))
-                                    (def rest-half (cadr cut))
-                                    (conj first-half
-                                          (-partition rest-half f)))))
-                          (-partition xs by)))))
+  (match (type by)
+    (,nil (partition xs id))
+    (,int (do
+            (defn -partition (xs n)
+              (let (tail (drop xs n))
+                (if (empty? tail)
+                  (list xs)
+                  (conj (take xs n)
+                        (-partition tail n)))))
+            (-partition xs (if (< by 1) 1 by))))
+    (,function (do
+                 (defn cut-by (xs f)
+                   (if (empty? xs)
+                     (list () ())
+                     (let (first-half (conj (first xs)
+                                            (take-while (rest xs)
+                                                        (let (f-of-first (f (first xs)))
+                                                          (fn (x) (= (f x) f-of-first))))))
+                       (list first-half
+                             (drop xs (size first-half))))))
+                 (defn -partition (xs f)
+                   (if (empty? xs)
+                     xs
+                     (do
+                       (def cut (cut-by xs f))
+                       (def first-half (car cut))
+                       (def rest-half (cadr cut))
+                       (conj first-half
+                             (-partition rest-half f)))))
+                 (-partition xs by)))))
 
 (defn uniq (xs by)
-      (-> (partition xs by)
-          (map first)))
+  (-> (partition xs by)
+      (map first)))
 
 '
 	'; string library, modeled after oak/libstr
 
 (defn char-at (s i)
-      (gets s i (inc i)))
+  (gets s i (inc i)))
 
 (defn char-between? (c start end)
-      (& (<= start c) (<= c end)))
+  (& (<= start c) (<= c end)))
 
 (defn upper? (c)
-      (char-between? c \'A\' \'Z\'))
+  (char-between? c \'A\' \'Z\'))
 
 (defn lower? (c)
-      (char-between? c \'a\' \'z\'))
+  (char-between? c \'a\' \'z\'))
 
 (defn digit? (c)
-      (char-between? c \'0\' \'9\'))
+  (char-between? c \'0\' \'9\'))
 
 (defn space? (c)
-      (| (= c \' \')
-         (= c \'\\t\')
-         (= c \'\\n\')
-         (= c \'\\r\')
-         (= c \'\\f\')))
+  (| (= c \' \')
+     (= c \'\\t\')
+     (= c \'\\n\')
+     (= c \'\\r\')
+     (= c \'\\f\')))
 
 (defn letter? (c)
-      (| (upper? c) (lower? c)))
+  (| (upper? c) (lower? c)))
 
 (defn word? (c)
-      (| (letter? c) (digit? c)))
+  (| (letter? c) (digit? c)))
 
 (defn join (strings joiner)
+  (do
+    (default joiner \'\')
+    (if (nil? strings)
+      \'\'
       (do
-        (default joiner \'\')
-        (if (nil? strings)
-          \'\'
-          (do
-            (defn -join (acc strings)
-                  (if (nil? strings)
-                    acc
-                    (-join (+ acc joiner (car strings))
-                           (cdr strings))))
-            (-join (car strings) (cdr strings))))))
+        (defn -join (acc strings)
+          (if (nil? strings)
+            acc
+            (-join (+ acc joiner (car strings))
+                   (cdr strings))))
+        (-join (car strings) (cdr strings))))))
+
+(defn str xs
+  (-> xs (map ->string) join))
 
 (defn starts-with? (s prefix)
-      (= (gets s 0 (len prefix))
-         prefix))
+  (= (gets s 0 (len prefix))
+     prefix))
 
 (defn ends-with? (s suffix)
-      (= (gets s (- (len s) (len suffix)))
-         suffix))
+  (= (gets s (- (len s) (len suffix)))
+     suffix))
 
 (defn str-index (s substr)
-      (do
-        (defn -iter (i)
-              (if (<= (len s) i)
-                -1
-                (if (= (gets s i (+ i (len substr))) substr)
-                  i
-                  (-iter (inc i)))))
-        (-iter 0)))
+  (do
+    (defn -iter (i)
+      (if (<= (len s) i)
+        -1
+        (if (= (gets s i (+ i (len substr))) substr)
+          i
+          (-iter (inc i)))))
+    (-iter 0)))
 
 (defn str-contains? (s substr)
-      (<= 0 (str-index s substr)))
+  (<= 0 (str-index s substr)))
 
 (defn cut (s sep)
-      (let (cut-at (str-index s sep))
-        (list (gets s 0 cut-at)
-              (gets s (+ cut-at (len sep))))))
+  (let (cut-at (str-index s sep))
+    (list (gets s 0 cut-at)
+          (gets s (+ cut-at (len sep))))))
 
 (defn upper (s)
-      (map s
-           (fn (c)
-               (if (lower? c)
-                 (char (- (codepoint c) 32))
-                 c))))
+  (map s
+       (fn (c)
+         (if (lower? c)
+           (char (- (codepoint c) 32))
+           c))))
 
 (defn lower (s)
-      (map s
-           (fn (c)
-               (if (upper? c)
-                 (char (+ (codepoint c) 32))
-                 c))))
+  (map s
+       (fn (c)
+         (if (upper? c)
+           (char (+ (codepoint c) 32))
+           c))))
 
 (defn matches-at? (s substr i)
-      (= (gets s i (+ i (len substr)))
-         substr))
+  (= (gets s i (+ i (len substr)))
+     substr))
 
 (defn replace (s old new)
-      (if (empty? old)
-        s
-        (do
-          (def lnew (len new))
-          (def lold (len old))
-          (defn -replace (acc i)
-                (if (matches-at? acc old i)
-                  (-replace (+ (gets acc 0 i)
-                               new
-                               (gets acc (+ i lold)))
-                            (+ i lnew))
-                  (if (< i (len acc))
-                    (-replace acc (inc i))
-                    acc)))
-          (-replace s 0))))
+  (if (empty? old)
+    s
+    (do
+      (def lnew (len new))
+      (def lold (len old))
+      (defn -replace (acc i)
+        (if (matches-at? acc old i)
+          (-replace (+ (gets acc 0 i)
+                       new
+                       (gets acc (+ i lold)))
+                    (+ i lnew))
+          (if (< i (len acc))
+            (-replace acc (inc i))
+            acc)))
+      (-replace s 0))))
 
 (defn split (s sep)
-      (if (empty? sep)
-        (reduce s (list) <<)
-        (do
-          (def lsep (len sep))
-          (defn -split (coll i last)
-                (if (matches-at? s sep i)
-                  (-split (<< coll (gets s last i))
-                          (+ i lsep)
-                          (+ i lsep))
-                  (if (< i (len s))
-                    (-split coll (inc i) last)
-                    (<< coll (gets s last)))))
-          (-split (list) 0 0))))
+  (if (empty? sep)
+    (reduce s (list) <<)
+    (do
+      (def lsep (len sep))
+      (defn -split (coll i last)
+        (if (matches-at? s sep i)
+          (-split (<< coll (gets s last i))
+                  (+ i lsep)
+                  (+ i lsep))
+          (if (< i (len s))
+            (-split coll (inc i) last)
+            (<< coll (gets s last)))))
+      (-split (list) 0 0))))
 
 (defn extend (pad n)
-      (do
-        (def times (int (/ n (len pad))))
-        (def part (% n (len pad)))
-        (defn -extend (base i)
-              (if (zero? i)
-                (<< base (gets pad 0 part))
-                (-extend (<< base pad)
-                         (dec i))))
-        (-extend \'\' times)))
+  (do
+    (def times (int (/ n (len pad))))
+    (def part (% n (len pad)))
+    (defn -extend (base i)
+      (if (zero? i)
+        (<< base (gets pad 0 part))
+        (-extend (<< base pad)
+                 (dec i))))
+    (-extend \'\' times)))
 
 (defn pad-start (s n pad)
-      (if (>= (len s) n)
-        s
-        (+ (extend pad (- n (len s)))
-           s)))
+  (if (>= (len s) n)
+    s
+    (+ (extend pad (- n (len s)))
+       s)))
 
 (defn pad-end (s n pad)
-      (if (>= (len s) n)
-        s
-        (+ s
-           (extend pad (- n (len s))))))
+  (if (>= (len s) n)
+    s
+    (+ s
+       (extend pad (- n (len s))))))
 
 (defn trim-start-space (s)
-      (do
-        (defn start (i)
-              (if (space? (char-at s i))
-                (start (inc i))
-                i))
-        (gets s (start 0))))
+  (do
+    (defn start (i)
+      (if (space? (char-at s i))
+        (start (inc i))
+        i))
+    (gets s (start 0))))
 
 (defn trim-start-non-empty (s prefix)
-      (do
-        (def max (len s))
-        (def lpref (len prefix))
-        (defn -trim (i)
-              (if (< i max)
-                (if (matches-at? s prefix i)
-                  (-trim (+ i lpref))
-                  i)
-                i))
-        (gets s (-trim 0))))
+  (do
+    (def max (len s))
+    (def lpref (len prefix))
+    (defn -trim (i)
+      (if (< i max)
+        (if (matches-at? s prefix i)
+          (-trim (+ i lpref))
+          i)
+        i))
+    (gets s (-trim 0))))
 
 (defn trim-start (s prefix)
-      (match prefix
-             (\'\' s)
-             (() (trim-start-space s))
-             ((trim-start-non-empty s prefix))))
+  (match prefix
+    (\'\' s)
+    (() (trim-start-space s))
+    ((trim-start-non-empty s prefix))))
 
 (defn trim-end-space (s)
-      (do
-        (defn end (i)
-              (if (space? (char-at s i))
-                (end (dec i))
-                i))
-        (gets s 0 (inc (end (dec (len s)))))))
+  (do
+    (defn end (i)
+      (if (space? (char-at s i))
+        (end (dec i))
+        i))
+    (gets s 0 (inc (end (dec (len s)))))))
 
 (defn trim-end-non-empty (s suffix)
-      (do
-        (def lsuf (len suffix))
-        (defn -trim (i)
-              (if (> i -1)
-                (if (matches-at? s suffix (- i lsuf))
-                  (-trim (- i lsuf))
-                  i)
-                i))
-        (gets s 0 (-trim (len s)))))
+  (do
+    (def lsuf (len suffix))
+    (defn -trim (i)
+      (if (> i -1)
+        (if (matches-at? s suffix (- i lsuf))
+          (-trim (- i lsuf))
+          i)
+        i))
+    (gets s 0 (-trim (len s)))))
 
 (defn trim-end (s suffix)
-      (match suffix
-             (\'\' s)
-             (() (trim-end-space s))
-             ((trim-end-non-empty s suffix))))
+  (match suffix
+    (\'\' s)
+    (() (trim-end-space s))
+    ((trim-end-non-empty s suffix))))
 
 (defn trim (s part)
-      (-> s
-          (trim-start part)
-          (trim-end part)))
+  (-> s
+    (trim-start part)
+    (trim-end part)))
 
 '
 	'; math library
 
 (def pi
-     3.14159265358979323846264338327950288419716939937510)
+  3.14159265358979323846264338327950288419716939937510)
 
 (def e
-     2.71828182845904523536028747135266249775724709369995)
+  2.71828182845904523536028747135266249775724709369995)
 
 (defn sq (n)
-      (* n n))
+  (* n n))
 
 (defn hypot (x0 y0 x1 y1)
-      (do
-        (default x1 0)
-        (default y1 0)
-        (sqrt (+ (sq (- x0 x1))
-                 (sq (- y0 y1))))))
+  (do
+    (default x1 0)
+    (default y1 0)
+    (sqrt (+ (sq (- x0 x1))
+             (sq (- y0 y1))))))
 
 (defn scale (x a b c d)
-      (let (normed (/ (- x a) (- b a)))
-        (if (& (nil? c) (nil? d))
-          normed
-          (+ c
-             (* normed (- d c))))))
+  (let (normed (/ (- x a) (- b a)))
+    (if (& (nil? c) (nil? d))
+      normed
+      (+ c
+         (* normed (- d c))))))
 
 (defn clamp (x a b)
-      (cond ((< x a) a)
-            ((> x b) b)
-            (x)))
+  (cond ((< x a) a)
+    ((> x b) b)
+    (x)))
 
 (defn round (n decimals)
-      (do
-        (default decimals 0)
-        (if (< decimals 0)
-          n
-          (let (order (# 10 decimals))
-            (if (>= n 0)
-              (/ (int (+ (* n order) 0.5)) order)
-              (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
+  (do
+    (default decimals 0)
+    (if (< decimals 0)
+      n
+      (let (order (# 10 decimals))
+        (if (>= n 0)
+          (/ (int (+ (* n order) 0.5)) order)
+          (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
 
 (defn even? (n)
-      (zero? (% n 2)))
+  (zero? (% n 2)))
 
 (defn odd? (n)
-      (= (% n 2) 1))
+  (= (% n 2) 1))
 
 ; Euclid\'s GCD algorithm
 (defn gcd (a b)
-      ; prereq: a < b
-      (do
-        (defn sub (a b)
-              (if (zero? a)
-                b
-                (sub (% b a) a)))
-        (def a (abs a))
-        (def b (abs b))
-        (if (> a b)
-          (sub b a)
-          (sub a b))))
+  ; prereq: a < b
+  (do
+    (defn sub (a b)
+      (if (zero? a)
+        b
+        (sub (% b a) a)))
+    (def a (abs a))
+    (def b (abs b))
+    (if (> a b)
+      (sub b a)
+      (sub a b))))
 
 ; LCM using GCD
 (defn lcm (a b)
-      (* a (/ b (gcd a b))))
+  (* a (/ b (gcd a b))))
 
 (defn factor? (n c)
-      (zero? (% n c)))
+  (zero? (% n c)))
 
 ; prime filter
 (defn prime? (n)
-      (if (< n 2)
-        false
-        (do
-          (def max (inc (int (sqrt n))))
-          (defn sub (i)
-                (if (= i max)
-                  true
-                  (if (factor? n i)
-                    false
-                    (sub (inc i)))))
-          (sub 2))))
+  (if (< n 2)
+    false
+    (do
+      (def max (inc (int (sqrt n))))
+      (defn sub (i)
+        (if (= i max)
+          true
+          (if (factor? n i)
+            false
+            (sub (inc i)))))
+      (sub 2))))
 
 ; prime factorize natural number
 (defn prime-factors (n)
-      (do
-        (defn sub (pfs m pf)
-              (if (= m 1)
-                pfs
-                (if (factor? m pf)
-                  (sub (cons pf pfs)
-                       (/ m pf)
-                       pf)
-                  (sub pfs
-                       m
-                       (inc pf)))))
-        (reverse (sub () n 2))))
+  (do
+    (defn sub (pfs m pf)
+      (if (= m 1)
+        pfs
+        (if (factor? m pf)
+          (sub (cons pf pfs)
+               (/ m pf)
+               pf)
+          (sub pfs
+               m
+               (inc pf)))))
+    (reverse (sub () n 2))))
 
 ; naive factorize
 (defn factors (n)
-      (let (first-half (-> (nat (int (sqrt n)))
-                           (filter (partial (factor? n ?)))))
-        (cond
-          ((nil? first-half) first-half)
-          ((nil? (cdr first-half)) first-half)
-          ((append first-half
-                   (let (rev-first-half (reverse first-half))
-                     (if (= (car rev-first-half)
-                            (/ n (car rev-first-half)))
-                       (cdr (map rev-first-half (partial (/ n ?))))
-                       (map rev-first-half (partial (/ n ?))))))))))
+  (let (first-half (-> (nat (int (sqrt n)))
+                     (filter (partial factor? n ?))))
+    (cond
+      ((nil? first-half) first-half)
+      ((nil? (cdr first-half)) first-half)
+      ((append first-half
+               (let (rev-first-half (reverse first-half))
+                 (if (= (car rev-first-half)
+                        (/ n (car rev-first-half)))
+                   (cdr (map rev-first-half (partial / n ?)))
+                   (map rev-first-half (partial / n ?)))))))))
 
 (def sum
-     (fn (ns) (reduce ns 0 +)))
+  (fn (ns) (reduce ns 0 +)))
 
 (def prod
-     (fn (ns) (reduce ns 1 *)))
+  (fn (ns) (reduce ns 1 *)))
 
 (defn mean (xs)
-      (/ (sum xs) (size xs)))
+  (/ (sum xs) (size xs)))
 
 (defn geomean (xs)
-      (# (prod xs) (/ 1 (size xs))))
+  (# (prod xs) (/ 1 (size xs))))
 
 (def min
-     (fn (xs)
-         (if (nil? xs)
-           ()
-           (reduce xs
-                   (car xs)
-                   (fn (a b)
-                       (if (< a b) a b))))))
+  (fn (xs)
+    (if (nil? xs)
+      ()
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) a b))))))
 
 (def max
-     (fn (xs)
-         (if (nil? xs)
-           ()
-           (reduce xs
-                   (car xs)
-                   (fn (a b)
-                       (if (< a b) b a))))))
+  (fn (xs)
+    (if (nil? xs)
+      ()
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) b a))))))
 
 '
 	'; sort library, implementing quicksort and mergesort
 
 (defn merge (left right)
-      (cond ((empty? left) right)
-            ((empty? right) left)
-            ((do
-               (def l (first left))
-               (def r (first right))
-               (if (<= l r)
-                 (conj l (merge (rest left) right))
-                 (conj r (merge left (rest right))))))))
+  (cond ((empty? left) right)
+    ((empty? right) left)
+    ((do
+       (def l (first left))
+       (def r (first right))
+       (if (<= l r)
+         (conj l (merge (rest left) right))
+         (conj r (merge left (rest right))))))))
 
 (defn mergesort (xs)
-      (if (< (size xs) 2)
-        xs
-        (let (split-at (int (/ (size xs) 2)))
-          (merge (mergesort (take xs split-at))
-                 (mergesort (drop xs split-at))))))
+  (if (< (size xs) 2)
+    xs
+    (let (split-at (int (/ (size xs) 2)))
+      (merge (mergesort (take xs split-at))
+             (mergesort (drop xs split-at))))))
 
 (defn quicksort (xs)
-      (if (< (size xs) 2)
-        xs
-        (let (pivot (nth xs (int (/ (dec (size xs)) 2)))) ; heuristic: pick midpoint
-          (-> (quicksort (filter xs (partial (< ? pivot))))
-              (append (filter xs (is pivot)))
-              (append (quicksort (filter xs (partial (> ? pivot)))))))))
+  (if (< (size xs) 2)
+    xs
+    (let (pivot (nth xs (int (/ (dec (size xs)) 2)))) ; heuristic: pick midpoint
+      (-> (quicksort (filter xs (partial < ? pivot)))
+        (append (filter xs (is pivot)))
+        (append (quicksort (filter xs (partial > ? pivot))))))))
 
 (defn sort! (xs pred)
-      (do
-        (default pred id)
-        (def vpred (map xs pred))
-        (defn partition (xs lo hi)
-              (let (pivot (nth vpred lo))
+  (do
+    (default pred id)
+    (def vpred (map xs pred))
+    (defn partition (xs lo hi)
+      (let (pivot (nth vpred lo))
+        (do
+          (defn lsub (i)
+            (if (< (nth vpred i) pivot)
+              (lsub (inc i))
+              i))
+          (defn rsub (j)
+            (if (> (nth vpred j) pivot)
+              (rsub (dec j))
+              j))
+          (defn sub (i j)
+            (do
+              (def i (lsub i))
+              (def j (rsub j))
+              (if (< i j)
                 (do
-                  (defn lsub (i)
-                        (if (< (nth vpred i) pivot)
-                          (lsub (inc i))
-                          i))
-                  (defn rsub (j)
-                        (if (> (nth vpred j) pivot)
-                          (rsub (dec j))
-                          j))
-                  (defn sub (i j)
-                        (do
-                          (def i (lsub i))
-                          (def j (rsub j))
-                          (if (< i j)
-                            (do
-                              (def tmp (nth xs i))
-                              (def tmpPred (nth vpred i))
-                              (nth! xs i (nth xs j))
-                              (nth! xs j tmp)
-                              (nth! vpred i (nth vpred j))
-                              (nth! vpred j tmpPred)
-                              (sub (inc i) (dec j)))
-                            j)))
-                  (sub lo hi))))
-        (defn quicksort (xs lo hi)
-              (if (| (< (size xs) 2)
-                     (>= lo hi))
-                xs
-                (let (p (partition xs lo hi))
-                  (do
-                    (quicksort xs lo p)
-                    (quicksort xs (inc p) hi)))))
-        (quicksort xs 0 (dec (size xs)))))
+                  (def tmp (nth xs i))
+                  (def tmpPred (nth vpred i))
+                  (nth! xs i (nth xs j))
+                  (nth! xs j tmp)
+                  (nth! vpred i (nth vpred j))
+                  (nth! vpred j tmpPred)
+                  (sub (inc i) (dec j)))
+                j)))
+          (sub lo hi))))
+    (defn quicksort (xs lo hi)
+      (if (| (< (size xs) 2)
+             (>= lo hi))
+        xs
+        (let (p (partition xs lo hi))
+          (do
+            (quicksort xs lo p)
+            (quicksort xs (inc p) hi)))))
+    (quicksort xs 0 (dec (size xs)))))
 
 (defn sort (xs pred)
-      (-> (slice xs)
-          (sort! pred)))
+  (-> (slice xs)
+    (sort! pred)))
 
 '
 	'; json library support for encoding/decoding JSON
 
 (defn json/serialize (x)
-      ())
+  ())
 
 (defn json/parse (s)
-      ())
+  ())
 
 '
 	'; random library, implementing utilities for working
 ; with pseudorandom sources of randomness
 
 (defn rand-bool ()
-      \'returns a random bool with equal chance\'
-      (< (rand) 0.5))
+  \'returns a random bool with equal chance\'
+  (< (rand) 0.5))
 
 (defn rand-int (min max)
-      \'returns a random integer in the range [min, max). If only a
-      single number is given as the argument, the range is assumed
-      to be [0, max) instead.\'
-      (int (rand-number (int min)
-                        (int max))))
+  \'returns a random integer in the range [min, max). If only a
+  single number is given as the argument, the range is assumed
+  to be [0, max) instead.\'
+  (int (rand-number (int min)
+                    (int max))))
 
 (defn rand-number (min max)
-      \'returns a random float in the range [min, max). If only a
-      single number is given as the argument, the range is assumed
-      to be [0, max) instead.\'
+  \'returns a random float in the range [min, max). If only a
+  single number is given as the argument, the range is assumed
+  to be [0, max) instead.\'
+  (do
+    (when (nil? max)
       (do
-        (when (nil? max)
-          (do
-            (def max min)
-            (def min 0)))
-        (+ min
-           (* (rand) (- max min)))))
+        (def max min)
+        (def min 0)))
+    (+ min
+       (* (rand) (- max min)))))
 
 (defn rand-choice (xs)
-      \'returns a randomly picked item from the list xs\'
-      (nth xs (rand-int 0 (size xs))))
+  \'returns a randomly picked item from the list xs\'
+  (nth xs (rand-int 0 (size xs))))
 
 '
 	'; composites: persistent immutable associative array
 
-(defmacro comp (terms)
+(defmacro comp terms
   \'comps store key-value pairs in a list as
   ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
   Each entry is a single cons cell rather than a list to make value lookup a
   bit more efficient.\'
   (do
     (def -comp
-         (fn (items)
-             (if (nil? items)
-               ()
-               (list ,cons
-                     (list ,cons (car items) (cadr items))
-                     (-comp (cddr items))))))
+      (fn (items)
+        (if (nil? items)
+          ()
+          (list ,cons
+                (list ,cons (car items) (cadr items))
+                (-comp (cddr items))))))
     (-comp terms)))
 
 (defn getc (cp k v)
-      \'recursive value lookup by key\'
-      (if (nil? cp)
-        v
-        (if (= k (caar cp))
-          (cdar cp)
-          (getc (cdr cp) k v))))
+  \'recursive value lookup by key\'
+  (if (nil? cp)
+    v
+    (if (= k (caar cp))
+      (cdar cp)
+      (getc (cdr cp) k v))))
 
 (defn setc (cp k v)
-      \'comps are immutable, and new values are set by adding new entries to the
-      head of the comp\\\'s underlying list. setc does not modify the given comp
-      and returns a new comp with the new key, value set.\'
-      (cons (cons k v)
-            (exclude cp
-                     (partial ((is k) (car ?))))))
+  \'comps are immutable, and new values are set by adding new entries to the
+  head of the comp\\\'s underlying list. setc does not modify the given comp
+  and returns a new comp with the new key, value set.\'
+  (cons (cons k v)
+        (exclude cp
+                 (partial = k (car ?)))))
 
 (defn keys (cp)
-      \'get just the comp keys\'
-      (map cp car))
+  \'get just the comp keys\'
+  (map cp car))
 
 (defn values (cp)
-      \'get just the comp values\'
-      (map cp cdr))
+  \'get just the comp values\'
+  (map cp cdr))
 
 ; functions with comps
 
 (defn freq (xs)
-      \'return a comp with frequency counts of each unique item in `xs`\'
-      (reduce xs
-              (comp)
-              (fn (counts x)
-                  (setc counts
-                        x
-                        (inc (getc counts x 0))))))
+  \'return a comp with frequency counts of each unique item in `xs`\'
+  (reduce xs
+          (comp)
+          (fn (counts x)
+            (setc counts
+                  x
+                  (inc (getc counts x 0))))))
+
+'
+	'; mut: mutable storage of data
+
+(defmacro defmut (name val)
+  (quasiquote
+    (def (unquote name) (cons (unquote val) ()))))
+
+(defn getm (mut)
+  (car mut))
+
+(defn setm! (mut val)
+  (car! mut val))
 
 '
 	'; utilities for writing tests
 
-(defmacro run-tests (terms)
+(defmacro run-tests terms
   (quasiquote
     (let
       (results (unquote (cons ,list terms)))
       (passed? cadr)
       (do
         (-> results
-            (exclude passed?)
-            (each (fn (r)
-                      (let
-                        (name (car r))
-                        (got (car (cddr r)))
-                        (expected (cadr (cddr r)))
-                        (println (+ name
-                                    \': expected \'
-                                    (->string expected)
-                                    \', got \'
-                                    (->string got)))))))
+          (exclude passed?)
+          (each (fn (r)
+                  (let
+                    (name (car r))
+                    (got (car (cddr r)))
+                    (expected (cadr (cddr r)))
+                    (println (+ name
+                                \': expected \'
+                                (->string expected)
+                                \', got \'
+                                (->string got)))))))
         (println (+ (->string (-> results
-                                  (filter passed?)
-                                  size))
+                                (filter passed?)
+                                size))
                     \'/\'
                     (->string (size results)))
                  \'tests passed.\')))))
 
-(defmacro test (terms)
-  (do
-    (def name (car terms))
-    (def expected (cadr terms))
-    (def body (car (cddr terms)))
-    (quasiquote
-      (let (got (unquote body))
-        (list (unquote name)
-              (= got (unquote expected)) ; result
-              got (unquote expected))))))
+(defmacro deftest (name expected body)
+  (quasiquote
+    (let (got (unquote body))
+      (list (unquote name)
+            (= got (unquote expected)) ; result
+            got (unquote expected)))))
 
 '
 ], withEnv)

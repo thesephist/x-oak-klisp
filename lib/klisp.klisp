@@ -2,138 +2,138 @@
 
 ; cons cell shorthands
 (def caar
-     (fn (x) (car (car x))))
+  (fn (x) (car (car x))))
 (def cadr
-     (fn (x) (car (cdr x))))
+  (fn (x) (car (cdr x))))
 (def cdar
-     (fn (x) (cdr (car x))))
+  (fn (x) (cdr (car x))))
 (def cddr
-     (fn (x) (cdr (cdr x))))
+  (fn (x) (cdr (cdr x))))
 
 ; lazy-evaluating boolean combinators
 (def !
-     (fn (x)
-         (if x false true)))
+  (fn (x)
+    (if x false true)))
 (def &
-     (macro terms
-            (if (= terms ())
-              ,true
-              (cons ,if
-                    (cons (car terms)
-                          (cons (cons ,& (cdr terms))
-                                (cons ,false ())))))))
+  (macro terms
+    (if (= terms ())
+      ,true
+      (cons ,if
+            (cons (car terms)
+                  (cons (cons ,& (cdr terms))
+                        (cons ,false ())))))))
 
 (def |
-     (macro terms
-            (if (= terms ())
-              ,false
-              (cons ,if
-                    (cons (car terms)
-                          (cons ,true
-                                (cons (cons ,| (cdr terms))
-                                      ())))))))
+  (macro terms
+    (if (= terms ())
+      ,false
+      (cons ,if
+            (cons (car terms)
+                  (cons ,true
+                        (cons (cons ,| (cdr terms))
+                              ())))))))
 (def ^
-     (macro terms
-            (cons ,!
-                  (cons (cons ,= terms)
-                        ()))))
+  (macro terms
+    (cons ,!
+          (cons (cons ,= terms)
+                ()))))
 (def <<
-     (fn (x y)
-         (if (= (type x) ,string)
-           (sets! x (len x) y)
-           ; O(n^2) behavior with linked lists
-           (do
-             (def -<<
-                  (fn (x)
-                      (if (= x ())
-                        (cons y ())
-                        (cons (car x)
-                              (-<< (cdr x) y)))))
-             (-<< x y)))))
+  (fn (x y)
+    (if (= (type x) ,string)
+      (sets! x (len x) y)
+      ; O(n^2) behavior with linked lists
+      (do
+        (def -<<
+          (fn (x)
+            (if (= x ())
+              (cons y ())
+              (cons (car x)
+                    (-<< (cdr x) y)))))
+        (-<< x y)))))
 (def != ^)
 
 ; type assertions
 (def nil?
-     (fn (x) (= x ())))
+  (fn (x) (= x ())))
 (def zero?
-     (fn (x) (= x 0)))
+  (fn (x) (= x 0)))
 (def int?
-     (fn (x) (= (type x) ,int)))
+  (fn (x) (= (type x) ,int)))
 (def float?
-     (fn (x) (= (type x) ,float)))
+  (fn (x) (= (type x) ,float)))
 (def number?
-     (fn (x) (| (int? x) (float? x))))
+  (fn (x) (| (int? x) (float? x))))
 (def bool?
-     (fn (x) (= (type x) ,bool)))
+  (fn (x) (= (type x) ,bool)))
 (def string?
-     (fn (x) (= (type x) ,string)))
+  (fn (x) (= (type x) ,string)))
 (def symbol?
-     (fn (x) (= (type x) ,symbol)))
+  (fn (x) (= (type x) ,symbol)))
 (def function?
-     (fn (x) (= (type x) ,function)))
+  (fn (x) (= (type x) ,function)))
 (def list?
-     (fn (x)
-         (| (= x ())
-            (= (type x) ,list))))
+  (fn (x)
+    (| (= x ())
+       (= (type x) ,list))))
 
 ; identity
 (def id
-     (fn (x) x))
+  (fn (x) x))
 (def is
-     (fn (x)
-         (fn (y) (= x y))))
+  (fn (x)
+    (fn (y) (= x y))))
 (def constantly
-     (fn (x)
-         (fn () x)))
+  (fn (x)
+    (fn () x)))
 
 ; basic math
 (def neg
-     (fn (n) (- 0 n)))
+  (fn (n) (- 0 n)))
 (def neg?
-     (fn (n) (< n 0)))
+  (fn (n) (< n 0)))
 (def not-neg?
-     (fn (n) (>= n 0)))
+  (fn (n) (>= n 0)))
 (def not-pos?
-     (fn (n) (<= n 0)))
+  (fn (n) (<= n 0)))
 (def abs
-     (fn (n)
-         (if (neg? n)
-           (neg n)
-           n)))
+  (fn (n)
+    (if (neg? n)
+      (neg n)
+      n)))
 (def sign
-     (fn (n)
-         (if (neg? n) -1 1)))
+  (fn (n)
+    (if (neg? n) -1 1)))
 (def sqrt
-     (fn (n) (# n 0.5)))
+  (fn (n) (# n 0.5)))
 (def even?
-     (fn (n) (zero? (% n 2))))
+  (fn (n) (zero? (% n 2))))
 (def odd?
-     (fn (n) (! (even? n))))
+  (fn (n) (! (even? n))))
 (def >=
-     (fn (a b) (! (< a b))))
+  (fn (a b) (! (< a b))))
 (def <=
-     (fn (a b) (! (> a b))))
+  (fn (a b) (! (> a b))))
 (def inc
-     (fn (n) (+ n 1)))
+  (fn (n) (+ n 1)))
 (def dec
-     (fn (n) (- n 1)))
+  (fn (n) (- n 1)))
 
 ; list methods
 (def range
-     (fn (start end step)
-         (do
-           (def -range
-                (fn (start end step)
-                    (if (< start end)
-                      (cons start
-                            (-range (+ start step) end step))
-                      ())))
-           (if (nil? step)
-             (if (nil? end)
-               (-range 0 start 1)
-               (-range start end 1))
-             (-range start end step)))))
+  (fn (start end step)
+    (do
+      (def -range
+        (fn (start end step)
+          (if (< start end)
+            (cons start
+                  (-range (+ start step) end step))
+            ())))
+      (if (nil? step)
+        (if (nil? end)
+          (-range 0 start 1)
+          (-range start end 1))
+        (-range start end step)))))
 
 (def nat
-     (fn (n) (range 1 (inc n))))
+  (fn (n) (range 1 (inc n))))
 
