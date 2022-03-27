@@ -364,10 +364,6 @@ fn eval(L, env) if type(L) {
 				_ -> expr
 			}
 		}
-		:doc -> {
-			impl := eval(L.(1).0, env).2
-			if impl.(1).(1).1 != ? -> impl.(1).(1).0
-		}
 		_ -> {
 			funcStub := eval(L.0, env)
 			func := eval(funcStub.1, env)
@@ -386,8 +382,11 @@ fn eval(L, env) if type(L) {
 }
 
 Env := {
+	// constants
 	'true': true
 	'false': false
+
+	// language primitives
 	'car': makeNative(fn(L) if L.0 != ? -> L.(0).0)
 	'cdr': makeNative(fn(L) if L.0 != ? -> L.(0).1)
 	'car!': makeNative(fn(L) L.(0).0 := L.(1).0)
@@ -413,6 +412,17 @@ Env := {
 		}
 		_ -> ''
 	})
+	'apply': makeNative(fn(L) {
+		funcStub := L.0
+		func := funcStub.1
+		args := L.(1).0
+		// can only apply a fn, not a macro
+		if !funcStub.0 -> func(args)
+	})
+	'doc': makeNative(fn(L) {
+		impl := L.(0).2
+		if impl.(1).(1).1 != ? -> impl.(1).(1).0
+	})
 
 	// ports of Oak's builtins
 	'char': makeNative(fn(L) char(int(L.0)))
@@ -424,6 +434,7 @@ Env := {
 	'float': makeNative(fn(L) float(L.0))
 	'rand': makeNative(rand)
 	'time': makeNative(time)
+	'nanotime': makeNative(nanotime)
 	'args': makeNative(fn(_) {
 		fn makeList(xs) if len(xs) {
 			0 -> ?
