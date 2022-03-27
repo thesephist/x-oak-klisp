@@ -110,17 +110,18 @@ Lastly, there are a handful of built-in functions that let Klisp programs intera
 λ (-> (read-file 'README.md')
       (split '\n')
       (filter (partial starts-with? ? '- '))
-      (map upper))
-('- FINISH `LIB/JSON`' '- AUTO-INDENT IN THE REPL, BASED ON PARSER ERRORS' '- LET\\* (OR MAKE LET POLYMORPHIC)' '- DOCSTRINGS LIKE CLOJURE, DEFINED AS STRINGS. JUST TRIM EACH LINE.' '- MAYBE I SHOULD BUILD UTILITIES TO BE ABLE TO WORK WITH KNOWLEDGE BASES IN KLISP? BRING BACK XIN NOTES.' '- FORMAT SOURCE FILES: `OAK FMT KLISP.OAK BUILD.OAK --FIX`' '- INSTALL TO `/USR/LOCAL/BIN/KLISP`: `OAK BUILD.OAK`' '- RUN TESTS: `KLISP TEST.KLISP`')
-λ (-> (list-files 'lib')
-      (map (partial getc ? ,name))
-      sort)
-('comp.klisp' 'iter.klisp' 'json.klisp' 'klisp.klisp' 'macro.klisp' 'math.klisp' 'random.klisp' 'sort.klisp' 'str.klisp' 'test.klisp')
+      (map upper)
+      (each println))
+- FINISH `LIB/JSON` FOR JSON PARSING AND SERIALIZATION. CAN MODEL OFF OF [OAK'S LIBJSON](HTTPS://OAKLANG.ORG/LIB/JSON/).
+- MAYBE I SHOULD BUILD UTILITIES TO BE ABLE TO WORK WITH KNOWLEDGE BASES IN KLISP? BRING BACK XIN NOTES?
+- FORMAT SOURCE FILES: `OAK FMT KLISP.OAK BUILD.OAK --FIX`
+- INSTALL TO `/USR/LOCAL/BIN/KLISP`: `OAK BUILD.OAK`
+- RUN TESTS: `KLISP TEST.KLISP`
 λ (-> (list-files 'lib')
       (map (partial getc ? ,name))
       (map (partial trim-end ? '.klisp'))
       sort)
-('comp' 'iter' 'json' 'klisp' 'macro' 'math' 'random' 'sort' 'str' 'test')
+('comp' 'iter' 'json' 'klisp' 'macro' 'math' 'mut' 'random' 'sort' 'str' 'test')
 ```
 
 ## Todos

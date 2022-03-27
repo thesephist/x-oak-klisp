@@ -69,10 +69,10 @@
 
   (deftest 'nth! of string'
     'ApXle'
-        (let (s 'Apple')
-          (do
-            (nth! s 2 'X')
-            s)))
+    (let (s 'Apple')
+      (do
+        (nth! s 2 'X')
+        s)))
   ; TODO: finish this section
 
   )
