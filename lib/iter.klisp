@@ -1,32 +1,41 @@
 ; iterator and sequence functions
 
 (defn base-iterator (seq)
+  'returns an empty string for strings, () for lists'
   (if (list? seq) () ''))
 
 (defn empty? (seq)
+  'reports whether a given iterable is empty'
   (= seq (base-iterator seq)))
 
 (defn first (seq)
+  'returns the first item of a given iterable, or the iterable\'s base iterator
+  if the iterable is empty'
   (if (list? seq)
     (car seq)
     (gets seq 0 1)))
 
 (defn first! (seq x)
+  'mutates in place the first item of a given iterable'
   (if (list? seq)
     (car! seq x)
     (sets! seq 0 x)))
 
 (defn rest (seq)
+  'returns the rest (all items excluding the first) of a given iterable, or the
+  iterable\'s base iterator if the iterable has one or fewer items'
   (if (list? seq)
     (cdr seq)
     (gets seq 1)))
 
 (defn rest! (seq xs)
+  'mutates in place everything except the first item of a given iterable'
   (if (list? seq)
     (cdr! seq xs)
     (sets! seq 1 xs)))
 
 (defn conj (x seq)
+  'conj(oin)s `x` onto the front of the iterable `seq`, producing a new seq'
   (if (list? seq)
     (cons x seq)
     (+ x seq)))
@@ -34,6 +43,8 @@
 ; generic iterator implementations
 
 (defn nth (xs i)
+  'returns the `i`th item of the iterable `xs`, or the base iterator of the
+  iterable if there is not sufficient length'
   (if (not-pos? i)
     (if (zero? i)
       (first xs)
@@ -41,6 +52,7 @@
     (nth (rest xs) (dec i))))
 
 (defn nth! (xs i x)
+  'mutates in place the `i`th item of the iterable `xs` to be `x`'
   (if (list? xs)
     (if (not-pos? i)
       (first! xs x)
@@ -48,9 +60,12 @@
     (sets! xs i (char-at x 0))))
 
 (defn second (xs)
-  (nth xs 2))
+  'returns the second item of an iterable; equivalent to (nth xs 1)'
+  (nth xs 1))
 
 (defn last (xs)
+  'returns the last item of an iterable, or the base iterator if the iterable
+  is empty'
   (if (empty? xs)
     xs
     (if (empty? (rest xs))
@@ -58,6 +73,8 @@
       (last (rest xs)))))
 
 (defn index (xs x)
+  'returns the index at which `x` is first found in the iterable `xs`, or -1 if
+  it cannot be found'
   (do
     (defn index-from (xs x i)
       (if (empty? xs)
@@ -68,9 +85,12 @@
     (index-from xs x 0)))
 
 (defn contains? (xs x)
+  'reports whether `x` is a member of the iterable `xs`'
   (<= 0 (index xs x)))
 
 (defn find (xs f?)
+  'returns the index at which `(f? x)` is true for some item `x` in the
+  iterable `xs`, or -1 if no such item exists'
   (do
     (defn find-from (xs f? i)
       (if (empty? xs)
@@ -81,6 +101,8 @@
     (find-from xs f? 0)))
 
 (defn some? (xs f?)
+  'returns true if at least one item in the iterable `xs` satisfies the
+  predicate `f?`. `f?` defaults to `id`'
   (do
     (default f? id)
     (if (empty? xs)
@@ -90,6 +112,8 @@
         (some (rest xs) f?)))))
 
 (defn every? (xs f?)
+  'returns false if at least one item in the iterable `xs` does not satisfy the
+  predicate `f?`. `f?` defaults to `id`'
   (do
     (default f? id)
     (if (empty? xs)
@@ -99,12 +123,14 @@
         false))))
 
 (defn append (xs ys)
+  'append two iterables together'
   (if (empty? xs)
     ys
     (conj (first xs)
           (append (rest xs) ys))))
 
 (defn reverse (xs)
+  'reverse the order of an iterable'
   (do
     (defn -reverse (acc xs)
       (if (empty? xs)
@@ -115,12 +141,14 @@
     (-reverse (base-iterator xs) xs)))
 
 (defn map (xs f)
+  'return an iterable that results from applying `f` to each item in `xs`'
   (if (empty? xs)
     xs
     (conj (f (first xs))
           (map (rest xs) f))))
 
 (defn reduce (xs acc f)
+  'return the result of folding the iterable `xs` with the reducer `f`'
   (if (empty? xs)
     acc
     (reduce (rest xs)
@@ -128,6 +156,8 @@
             f)))
 
 (defn filter (xs f?)
+  'return an iterable containing only the items from `xs` that satisfy the
+  predicate `f?`'
   (if (empty? xs)
     xs
     (if (f? (first xs))
@@ -136,6 +166,8 @@
       (filter (rest xs) f?))))
 
 (defn exclude (xs f?)
+  'return an iterable containing only the items from `xs` that did not satisfy
+  the predicate `f?`'
   (if (empty? xs)
     xs
     (if (f? (first xs))
@@ -144,31 +176,28 @@
             (exclude (rest xs) f?)))))
 
 (defn each (xs f)
+  'apply the function `f` to each item in `xs`'
   (unless (empty? xs)
     (do
       (f (first xs))
       (each (rest xs) f))))
 
 (defn size (xs)
+  'return the number of items in the iterable `xs`'
   (if (list? xs)
     (reduce xs 0 inc)
     (len xs)))
 
-(defn zip (xs ys f)
-  (do
-    (default f (if (list? xs) list +))
-    (if (| (empty? xs) (empty? ys))
-      ()
-      (cons (f (first xs) (first ys))
-            (zip (rest xs) (rest ys) f)))))
-
 (defn take (xs n)
+  'return an iterable containing only the first `n` items of `xs`'
   (if (| (empty? xs) (zero? n))
     (base-iterator xs)
     (conj (first xs)
           (take (rest xs) (dec n)))))
 
 (defn take-while (xs f?)
+  'return an iterable containing only the first consecutive items of `xs` that
+  satisfy the predicate `f?`'
   (if (empty? xs)
     xs
     (if (f? (first xs))
@@ -177,11 +206,14 @@
       (base-iterator xs))))
 
 (defn drop (xs n)
+  'return an iterable containing all items after the first `n` of `xs`'
   (if (| (empty? xs) (zero? n))
     xs
     (drop (rest xs) (dec n))))
 
 (defn drop-while (xs f?)
+  'return an iterable excluding the first consecutive items of `xs` that
+  satisfy the predicate `f?`'
   (if (empty? xs)
     xs
     (if (f? (first xs))
@@ -189,6 +221,8 @@
       xs)))
 
 (defn slice (xs start end)
+  'return a sub-slice of the iterable `xs` from index `start` to `end`, which
+  are 0 and `(size xs)` by default. For strings, this is equivalent to `gets`.'
   (do
     (default start 0)
     (default end (size xs))
@@ -197,12 +231,34 @@
         (take (- end start)))))
 
 (defn flatten (xs)
-  (reduce xs () append))
+  'given a list of iterables, return a new iterable resulting from joining
+  together every iterable in the list'
+  (reduce xs (base-iterator (first xs)) append))
+
+(defn zip (xs ys f)
+  'return an iterable whose nth item is the combination of nth items of `xs`
+  and `ys`. By default, elements of the two iterables are combined using
+  `list`, but this can be overridden using `f`.'
+  (do
+    (default f (if (list? xs) list +))
+    (if (| (empty? xs) (empty? ys))
+      ()
+      (cons (f (first xs) (first ys))
+            (zip (rest xs) (rest ys) f)))))
+
+(defn interleave (xs ys)
+  'given two iterables, return a new iterable where items appear first from
+  `xs`, then `ys`, then `xs` again, and so on, interleaving items of each
+  iterable'
+  (-> (zip xs ys) flatten))
 
 (defn compact (xs)
+  'filter out nil values from the given list, returning a new list'
   (exclude xs (is ())))
 
 (defn partition (xs by)
+  'partition the given iterable by either count or a predicate `by`, returning
+  a list of iterables, each of the same type as `xs`'
   (match (type by)
     (,nil (partition xs id))
     (,int (do
@@ -216,7 +272,7 @@
     (,function (do
                  (defn cut-by (xs f)
                    (if (empty? xs)
-                     (list () ())
+                     (list (base-iterator xs) (base-iterator xs))
                      (let (first-half (conj (first xs)
                                             (take-while (rest xs)
                                                         (let (f-of-first (f (first xs)))
@@ -225,16 +281,18 @@
                              (drop xs (size first-half))))))
                  (defn -partition (xs f)
                    (if (empty? xs)
-                     xs
+                     ()
                      (do
                        (def cut (cut-by xs f))
                        (def first-half (car cut))
                        (def rest-half (cadr cut))
-                       (conj first-half
+                       (cons first-half
                              (-partition rest-half f)))))
                  (-partition xs by)))))
 
 (defn uniq (xs by)
+  'returns a list of unique items in `xs`, assuming a pre-sorted `xs`. This is
+  analogous to the UNIX "sort" utility.'
   (-> (partition xs by)
       (map first)))
 
