@@ -26,7 +26,7 @@
                     (->string (size results)))
                  'tests passed.')))))
 
-(defmacro deftest (name expected body)
+(defmacro deftest (name body expected)
   (quasiquote
     (let
       (got (unquote body))
