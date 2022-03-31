@@ -72,9 +72,9 @@ highlight link klispKeywordCadr Keyword
 highlight link klispKeywordTy Keyword
 
 " functions
-syntax match klispFunctionForm "\v\(\s*[A-Za-z0-9\-?!+*/:><=%&|]+" contains=klispFunctionName,klispKeywordTyContainer
-syntax match klispFunctionForm "\v\(\s*defn\s+[A-Za-z0-9\-?!+*/:><=%&|]+" contains=klispFunctionName
-syntax match klispFunctionName "\v[A-Za-z0-9\-?!+*/:><=%&|]+" contained contains=klispKeyword,klispKeywordCadrContainer
+syntax match klispFunctionForm "\v\(\s*[A-Za-z0-9\-?!+*/#:><=%&|]+" contains=klispFunctionName,klispKeywordTyContainer
+syntax match klispFunctionForm "\v\(\s*defn\s+[A-Za-z0-9\-?!+*/#:><=%&|]+" contains=klispFunctionName
+syntax match klispFunctionName "\v[A-Za-z0-9\-?!+*/#:><=%&|]+" contained contains=klispKeyword,klispKeywordCadrContainer
 highlight link klispFunctionName Function
 
 " strings
