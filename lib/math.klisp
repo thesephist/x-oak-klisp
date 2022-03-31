@@ -8,6 +8,9 @@
   'the base of the natural logarithm'
   2.71828182845904523536028747135266249775724709369995)
 
+(defn // ns
+  (int (apply / ns)))
+
 (defn double (n)
   (+ n n))
 
