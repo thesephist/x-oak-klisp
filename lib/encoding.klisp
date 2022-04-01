@@ -1,0 +1,20 @@
+; various data encodings: ascii
+
+(defn bytes (s)
+  (-> s split (map codepoint)))
+
+(defn int->hex (n)
+  (if (< n 16)
+    (char-at '0123456789abcdef' n)
+    (+ (int->hex (// n 16))
+       (int->hex (% n 16)))))
+
+(defn hex->int (s)
+  (-> (range (len s))
+      (map (fn (i)
+             (* (# 16 i)
+                (index '0123456789abcdef'
+                       (char-at s (- (len s) i 1))))))
+      sum
+      int))
+

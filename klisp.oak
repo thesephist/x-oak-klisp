@@ -599,6 +599,7 @@ fn loadStdlib(withEnv) loadLibSources([
 	'{{ lib/sort }}'
 	'{{ lib/json }}'
 	'{{ lib/random }}'
+	'{{ lib/encoding }}'
 	'{{ lib/comp }}'
 	'{{ lib/mut }}'
 	'{{ lib/test }}'
