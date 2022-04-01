@@ -1572,6 +1572,9 @@ fn loadStdlib(withEnv) loadLibSources([
   \'the base of the natural logarithm\'
   2.71828182845904523536028747135266249775724709369995)
 
+(defn // ns
+  (int (apply / ns)))
+
 (defn double (n)
   (+ n n))
 
@@ -1823,6 +1826,27 @@ fn loadStdlib(withEnv) loadLibSources([
   (nth xs (rand-int 0 (size xs))))
 
 '
+	'; various data encodings
+
+(defn bytes (s)
+  (-> s split (map codepoint)))
+
+(defn int->hex (n)
+  (if (< n 16)
+    (char-at \'0123456789abcdef\' n)
+    (+ (int->hex (// n 16))
+       (int->hex (% n 16)))))
+
+(defn hex->int (s)
+  (-> (range (len s))
+      (map (fn (i)
+             (* (# 16 i)
+                (index \'0123456789abcdef\'
+                       (char-at s (- (len s) i 1))))))
+      sum
+      int))
+
+'
 	'; composites: persistent immutable associative arrays
 
 (defmacro comp terms
@@ -1917,7 +1941,7 @@ fn loadStdlib(withEnv) loadLibSources([
                     (->string (size results)))
                  \'tests passed.\')))))
 
-(defmacro deftest (name expected body)
+(defmacro deftest (name body expected)
   (quasiquote
     (let
       (got (unquote body))

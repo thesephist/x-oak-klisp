@@ -1,79 +1,99 @@
 ; behavior test suite using the "test" library
 
 (run-tests
-  (deftest 'basic addition'
-    4
-    (+ 2 2))
-  (deftest 'basic subtraction'
-    5
-    (- 10 5))
+  (deftest 'basic addition' (+ 2 2) 4)
+  (deftest 'variadic addition' (+ 1 2 3 4 5) 15)
+  (deftest 'basic subtraction' (- 10 5) 5)
+  (deftest 'variadic subtraction' (- 100 50 10 2) 38)
+  (deftest 'basic multiplication' (* 5 8) 40)
+  (deftest 'variadic multiplication' (* 2 3 5 8) 240)
 
+  ; iter
   (deftest 'base-iterator list'
-    ()
-    (base-iterator (list 1 2 3)))
+    (base-iterator (list 1 2 3))
+    ())
   (deftest 'base-iterator string'
-    ''
-    (base-iterator 'hello'))
+    (base-iterator 'hello')
+    '')
 
   (deftest 'first empty list'
-    ()
-    (first ()))
+    (first ())
+    ())
   (deftest 'first list'
-    10
-    (first (list 10 20 30)))
+    (first (list 10 20 30))
+    10)
   (deftest 'first empty string'
-    ''
-    (first ''))
+    (first '')
+    '')
   (deftest 'first string'
-    'L'
-    (first 'Lisp'))
+    (first 'Lisp')
+    'L')
 
   (deftest 'rest empty list'
-    ()
-    (rest ()))
+    (rest ())
+    ())
   (deftest 'rest list'
-    (list 20 30)
-    (rest (list 10 20 30)))
+    (rest (list 10 20 30))
+    (list 20 30))
   (deftest 'rest empty string'
-    ''
-    (rest ''))
+    (rest '')
+    '')
   (deftest 'rest string'
-    'isp'
-    (rest 'Lisp'))
+    (rest 'Lisp')
+    'isp')
 
   (deftest 'conj onto string'
-    'Lisp'
-    (conj 'L' 'isp'))
+    (conj 'L' 'isp')
+    'Lisp')
   (deftest 'conj onto list'
-    (list 10 20 30 40)
-    (conj 10 (list 20 30 40)))
+    (conj 10 (list 20 30 40))
+    (list 10 20 30 40))
 
   (deftest 'nth of string'
-    'p'
-    (nth 'Apple' 2))
+    (nth 'Apple' 2)
+    'p')
   (deftest 'nth of string, too low'
-    ''
-    (nth 'Apple' -2))
+    (nth 'Apple' -2)
+    '')
   (deftest 'nth of string, too high'
-    ''
-    (nth 'Apple' 10))
+    (nth 'Apple' 10)
+    '')
   (deftest 'nth of list'
-    3
-    (nth (nat 5) 2))
+    (nth (nat 5) 2)
+    3)
   (deftest 'nth of list, too low'
-    ()
-    (nth (nat 5) -2))
+    (nth (nat 5) -2)
+    ())
   (deftest 'nth of list, too high'
-    ()
-    (nth (nat 5) 10))
+    (nth (nat 5) 10)
+    ())
 
   (deftest 'nth! of string'
-    'ApXle'
     (let (s 'Apple')
       (do
         (nth! s 2 'X')
-        s)))
-  ; TODO: finish this section
+        s))
+    'ApXle')
 
-  )
+  ; encoding
+  (deftest 'bytes of empty string'
+    (bytes '')
+    (list))
+  (deftest 'bytes of string'
+    (bytes 'Hello')
+    (list 72 101 108 108 111))
+
+  (deftest 'int->hex'
+    (-> (list 0 3 10 64 100 255 2022)
+        (map int->hex))
+    (list '0' '3' 'a' '40' '64' 'ff' '7e6'))
+  (deftest 'hex->int'
+    (-> (list '0' '3' 'a' '40' '64' 'ff' '7e6')
+        (map hex->int))
+    (list 0 3 10 64 100 255 2022))
+  (deftest 'int/hex round-trips'
+    (-> (range 2 1000 31)
+        (map int->hex)
+        (map hex->int))
+    (range 2 1000 31)))
 
