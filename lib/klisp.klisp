@@ -111,10 +111,6 @@
   (fn (n) (zero? (% n 2))))
 (def odd?
   (fn (n) (! (even? n))))
-(def >=
-  (fn (a b) (! (< a b))))
-(def <=
-  (fn (a b) (! (> a b))))
 (def inc
   (fn (n) (+ n 1)))
 (def dec

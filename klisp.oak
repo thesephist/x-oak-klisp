@@ -467,6 +467,28 @@ Env := {
 			})
 		}
 	})
+	'<=': makeNative(fn(L) if L {
+		? -> true
+		_ -> {
+			last := L.0
+			L.1 |> reduceSexpr(true, fn(acc, x) {
+				y := acc & last <= x
+				last <- x
+				y
+			})
+		}
+	})
+	'>=': makeNative(fn(L) if L {
+		? -> true
+		_ -> {
+			last := L.0
+			L.1 |> reduceSexpr(true, fn(acc, x) {
+				y := acc & last >= x
+				last <- x
+				y
+			})
+		}
+	})
 	'+': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a + b))
 	'-': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a - b))
 	'*': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a * b))
