@@ -109,7 +109,7 @@
       false
       (if (f? (first xs))
         true
-        (some (rest xs) f?)))))
+        (some? (rest xs) f?)))))
 
 (defn every? (xs f?)
   'returns false if at least one item in the iterable `xs` does not satisfy the
@@ -122,12 +122,15 @@
         (every? (rest xs) f?)
         false))))
 
-(defn append (xs ys)
-  'append two iterables together'
-  (if (empty? xs)
-    ys
-    (conj (first xs)
-          (append (rest xs) ys))))
+(defn append xs
+  'join one or more iterables together'
+  (do
+    (defn append-two (xs ys)
+      (if (empty? xs)
+        ys
+        (conj (first xs)
+              (append (rest xs) ys))))
+    (reduce xs () append-two)))
 
 (defn reverse (xs)
   'reverse the order of an iterable'
@@ -174,6 +177,12 @@
       (exclude (rest xs) f?)
       (conj (first xs)
             (exclude (rest xs) f?)))))
+
+(defn separate (xs f?)
+  'sort elements of iterable `xs` into two different iterables depending on the
+  result of the predicate `f?`'
+  (list (filter xs f?)
+        (exclude xs f?)))
 
 (defn each (xs f)
   'apply the function `f` to each item in `xs`'
@@ -254,7 +263,7 @@
 
 (defn compact (xs)
   'filter out nil values from the given list, returning a new list'
-  (exclude xs (is ())))
+  (exclude xs nil?))
 
 (defn partition (xs by)
   'partition the given iterable by either count or a predicate `by`, returning
