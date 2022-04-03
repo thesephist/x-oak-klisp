@@ -1,12 +1,72 @@
 ; behavior test suite using the "test" library
 
 (run-tests
+  ; language
   (deftest 'basic addition' (+ 2 2) 4)
   (deftest 'variadic addition' (+ 1 2 3 4 5) 15)
   (deftest 'basic subtraction' (- 10 5) 5)
   (deftest 'variadic subtraction' (- 100 50 10 2) 38)
   (deftest 'basic multiplication' (* 5 8) 40)
   (deftest 'variadic multiplication' (* 2 3 5 8) 240)
+  (deftest 'basic power' (# 2 10) 1024)
+  (deftest 'variadic power' (# 2 2 3 2) 4096)
+
+  (deftest 'variadic =' (= 2 (+ 1 1) 2 2 2) true)
+  (deftest 'variadic = (inverse)' (= 2 (+ 1 1) 3 2 2) false)
+  (deftest 'variadic <' (< 1 2 6 100 200) true)
+  (deftest 'variadic < (inverse)' (< 1 2 -6 100 200) false)
+  (deftest 'variadic >' (> 200 100 6 2 1) true)
+  (deftest 'variadic > (inverse)' (> 200 100 -6 2 1) false)
+  (deftest 'variadic <=' (<= 1 1 2 5 5 100) true)
+  (deftest 'variadic <= (inverse)' (<= 1 1 2 5 3 100) false)
+  (deftest 'variadic >=' (>= 100 5 5 2 1 1) true)
+  (deftest 'variadic >= (inverse)' (>= 100 4 5 2 1 1) false)
+
+  ; core
+  (deftest 'caar'
+    (caar ,((1 2) (3 4)))
+    1)
+  (deftest 'cadr'
+    (cadr ,((1 2) (3 4)))
+    ,(3 4))
+  (deftest 'cdar'
+    (cdar ,((1 2) (3 4)))
+    ,(2))
+  (deftest 'cddr'
+    (cddr ,((1 2) (3 4)))
+    ())
+
+  (deftest 'function?'
+    (every? (list car caar cond) function?)
+    true)
+  (deftest 'list?'
+    (every? (list () (list 1) (list 1 2)) list?)
+    true)
+
+  (deftest 'is'
+    (let (is-3 (is 3))
+      (is-3 3))
+    true)
+  (deftest 'constantly'
+    (let (constantly-3 (constantly 3))
+      (list-of 5 (constantly-3)))
+    (list 3 3 3 3 3))
+
+  (deftest 'range, 1 arg'
+    (range 10)
+    (list 0 1 2 3 4 5 6 7 8 9))
+  (deftest 'range, 2 args'
+    (range 5 10)
+    (list 5 6 7 8 9))
+  (deftest 'range, 3 args'
+    (range 5 10 2)
+    (list 5 7 9))
+  (deftest 'range, descending'
+    (range 10 0 -3)
+    (list 10 7 4 1))
+  (deftest 'nat'
+    (nat 12)
+    (range 1 13))
 
   ; iter
   (deftest 'base-iterator list'
@@ -68,12 +128,235 @@
     (nth (nat 5) 10)
     ())
 
+  (deftest 'nth! of list'
+    (let (l (list 1 2 3 4 5))
+      (do
+        (nth! l 3 100)
+        l))
+    (list 1 2 3 100 5))
   (deftest 'nth! of string'
     (let (s 'Apple')
       (do
         (nth! s 2 'X')
         s))
     'ApXle')
+
+  (deftest 'last of empty list'
+    (last ()) ())
+  (deftest 'last of empty string'
+    (last '') '')
+  (deftest 'last of list'
+    (last (list 1 2 3 4 5)) 5)
+  (deftest 'last of string'
+    (last 'hello world') 'd')
+
+  (deftest 'index into list'
+    (index (list 'sun' 'rain' 'cloud' 'mist' 'snow') 'mist')
+    3)
+  (deftest 'index into list, not found'
+    (index (list 'sun' 'rain' 'cloud' 'mist' 'snow') 'fire')
+    -1)
+  (deftest 'index into string'
+    (index 'LOVE DIVE' 'I')
+    6)
+  (deftest 'index into string, not found'
+    (index 'LOVE DIVE' 'X')
+    -1)
+
+  (deftest 'every? that passes'
+    (every? (list 2 4 6 200 10) even?)
+    true)
+  (deftest 'every? that fails'
+    (every? (list 2 4 6 200 13) even?)
+    false)
+  (deftest 'some? that passes'
+    (some? (list 2 4 6 200 13) even?)
+    true)
+  (deftest 'some? that fails'
+    (some? (list 1 3 5 199 13) even?)
+    false)
+
+  (deftest 'append lists'
+    (append (range 5) (range 3))
+    (list 0 1 2 3 4 0 1 2))
+  (deftest 'append multiple lists'
+    (append (nat 3) (list 'a' 'b' 'c') ,(do whatever))
+    (list 1 2 3 'a' 'b' 'c' ,do ,whatever))
+  (deftest 'append strings'
+    (append 'hello' 'world')
+    'helloworld')
+  (deftest 'append multiple strings'
+    (append 'rose' 'jennie' 'lisa' 'jisoo')
+    'rosejennielisajisoo')
+
+  (deftest 'reverse a list'
+    (reverse (range 5))
+    (list 4 3 2 1 0))
+  (deftest 'reverse a string'
+    (reverse 'alphabet')
+    'tebahpla')
+
+  (deftest 'interleave'
+    (interleave (list 'first' 'second' 'third' 'fourth') (nat 10))
+    (list 'first' 1
+          'second' 2
+          'third' 3
+          'fourth' 4))
+
+  (deftest 'compact'
+    (compact (list 1 () 3 5 () 4 ()))
+    (list 1 3 5 4))
+
+  (deftest 'partition by id'
+    (partition (list 1 1 1 2 2 5 5 5 5 5 5 2 2))
+    (quote ((1 1 1) (2 2) (5 5 5 5 5 5) (2 2))))
+  (deftest 'partition by count'
+    (partition (list 1 1 1 2 2 5 5 5 5 5 5 2 2) 5)
+    (quote ((1 1 1 2 2) (5 5 5 5 5) (5 2 2))))
+  (deftest 'partition by predicate'
+    (partition (list 1 2 3 6 9 5 2 6 120 4) (partial factor? ? 3))
+    (quote ((1 2) (3 6 9) (5 2) (6 120) (4))))
+
+  ; str
+  (deftest 'char-at'
+    (char-at 'hello world' 5)
+    ' ')
+
+  (deftest 'upper?'
+    (separate 'abcABCeFd123_. ' upper?)
+    (list 'ABCF' 'abced123_. '))
+  (deftest 'lower?'
+    (separate 'abcABCeFd123_. ' lower?)
+    (list 'abced' 'ABCF123_. '))
+  (deftest 'digit?'
+    (separate 'abcABCeFd123_. ' digit?)
+    (list '123' 'abcABCeFd_. '))
+  (deftest 'space?'
+    (separate ' \t\n\r\fabc._' space?)
+    (list ' \t\n\r\f' 'abc._'))
+  (deftest 'letter?'
+    (separate 'abcABCeFd123_. ' letter?)
+    (list 'abcABCeFd' '123_. '))
+  (deftest 'word?'
+    (separate 'abcABCeFd123_. ' word?)
+    (list 'abcABCeFd123' '_. '))
+
+  (deftest 'join with no joiner'
+    (join (list 'rose' 'jennie' 'lisa' 'jisoo'))
+    'rosejennielisajisoo')
+  (deftest 'join with joiner'
+    (join (list 'rose' 'jennie' 'lisa' 'jisoo') ', ')
+    'rose, jennie, lisa, jisoo')
+
+  (deftest 'str'
+    (str 1 2 'three' ,symbolname (list 1 2 3))
+    '12threesymbolname(1 2 3)')
+
+  (deftest 'starts-with? -> true'
+    (starts-with? 'hello' 'hell')
+    true)
+  (deftest 'starts-with? -> false'
+    (starts-with? 'hello' 'good')
+    false)
+  (deftest 'ends-with? -> true'
+    (ends-with? 'hello' 'llo')
+    true)
+  (deftest 'ends-with? -> false'
+    (ends-with? 'hello' 'bye')
+    false)
+
+  (deftest 'str-index'
+    (str-index 'hello world' 'world')
+    6)
+  (deftest 'str-index -> -1'
+    (str-index 'hello world' 'goodbye')
+    -1)
+
+  (deftest 'cut'
+    (cut 'hello world how are you' ' ')
+    (list 'hello' 'world how are you'))
+  (deftest 'cut with multi-char delimiter'
+    (cut 'hello worlld' 'll')
+    (list 'he' 'o worlld'))
+
+  (deftest 'upper'
+    (upper 'abcABCeFd123_. ')
+    'ABCABCEFD123_. ')
+  (deftest 'lower'
+    (lower 'abcABCeFd123_. ')
+    'abcabcefd123_. ')
+
+  (deftest 'replace'
+    (replace 'hello world' 'l' '_ll_')
+    'he_ll__ll_o wor_ll_d')
+
+  (deftest 'split'
+    (split 'hello world' 'l')
+    (list 'he' '' 'o wor' 'd'))
+
+  (deftest 'pad-start'
+    (pad-start '25.0' 8 '234')
+    '234225.0')
+  (deftest 'pad-end'
+    (pad-end '25.0' 8 '234')
+    '25.02342')
+
+  (deftest 'trim-start'
+    (trim-start 'abcabcabdef' 'abc')
+    'abdef')
+  (deftest 'trim-start spaces'
+    (trim-start '   \thi  \n  ')
+    'hi  \n  ')
+  (deftest 'trim-end'
+    (trim-end 'abcefdefdefdef' 'def')
+    'abcef')
+  (deftest 'trim-end spaces'
+    (trim-end '   \thi  \n  ')
+    '   \thi')
+  (deftest 'trim'
+    (trim '--------hi--------' '---')
+    '--hi--')
+  (deftest 'trim spaces'
+    (trim '   \thi  \n  ')
+    'hi')
+
+  ; math
+  (deftest '//'
+    (// 10 3)
+    3)
+  (deftest 'variadic //'
+    (// 100 3 5)
+    6)
+  (deftest 'round'
+    (-> (range 6)
+        (map (partial round π ?)))
+    (list 3
+          3.1
+          3.14
+          3.142
+          3.1416
+          3.14159))
+
+  ; sort
+  (deftest 'mergesort'
+    (-> (list-of 25 (rand-int 20))
+        mergesort
+        ((partial apply <= ?)))
+    true)
+  (deftest 'quicksort'
+    (-> (list-of 25 (rand-int 20))
+        quicksort
+        ((partial apply <= ?)))
+    true)
+  (deftest 'sort'
+    (-> (list-of 25 (rand-int 20))
+        sort
+        ((partial apply <= ?)))
+    true)
+  (deftest 'sort by predicate'
+    (-> (list 34 26 125 69 243 105)
+        (sort (partial % ? 100)))
+    (list 105 125 26 34 243 69))
 
   ; encoding
   (deftest 'bytes of empty string'
@@ -92,8 +375,60 @@
         (map hex->int))
     (list 0 3 10 64 100 255 2022))
   (deftest 'int/hex round-trips'
-    (-> (range 2 1000 31)
+    (-> (range 2 500 31)
         (map int->hex)
         (map hex->int))
-    (range 2 1000 31)))
+    (range 2 500 31))
+
+  ; comp
+  (deftest 'empty comp constructor'
+    (comp)
+    ())
+  (deftest 'comp constructor'
+    (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
+    ,((1 . 2)
+      (a . b)
+      ('hi' . 'hello')
+      ((1 2) . (4 5))))
+  (deftest 'getc'
+    (-> (comp 1 200 3 400 5 600)
+        (getc 3))
+    400)
+  (deftest 'getc defaults to ()'
+    (-> (comp 1 200 3 400 5 600)
+        (getc 10))
+    ())
+  (deftest 'setc'
+    (-> (comp 1 200 3 400 5 600)
+        (setc 10 1000)
+        (getc 10))
+    1000)
+  (deftest 'keys'
+    (-> (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
+        keys)
+    (list 1 ,a 'hi' (list 1 2)))
+  (deftest 'values'
+    (-> (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
+        values)
+    (list 2 ,b 'hello' (list 4 5)))
+  (deftest 'freq'
+    (-> (list 1 1 1 2 2 5 8 8 8 8 8 8 10 12)
+        freq
+        (sort car))
+    (comp 1 3
+          2 2
+          5 1
+          8 6
+          10 1
+          12 1))
+
+  ; mut
+  (deftest 'defmut defines a mutable value'
+    (do
+      (defmut my-val 10)
+      (def original (getm my-val))
+      (setm! my-val 42)
+      (def final (getm my-val))
+      (list original final))
+    (list 10 42)))
 

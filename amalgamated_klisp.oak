@@ -467,6 +467,28 @@ Env := {
 			})
 		}
 	})
+	'<=': makeNative(fn(L) if L {
+		? -> true
+		_ -> {
+			last := L.0
+			L.1 |> reduceSexpr(true, fn(acc, x) {
+				y := acc & last <= x
+				last <- x
+				y
+			})
+		}
+	})
+	'>=': makeNative(fn(L) if L {
+		? -> true
+		_ -> {
+			last := L.0
+			L.1 |> reduceSexpr(true, fn(acc, x) {
+				y := acc & last >= x
+				last <- x
+				y
+			})
+		}
+	})
 	'+': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a + b))
 	'-': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a - b))
 	'*': makeNative(fn(L) L.1 |> reduceSexpr(L.0, fn(a, b) a * b))
@@ -704,10 +726,6 @@ fn loadStdlib(withEnv) loadLibSources([
   (fn (n) (zero? (% n 2))))
 (def odd?
   (fn (n) (! (even? n))))
-(def >=
-  (fn (a b) (! (< a b))))
-(def <=
-  (fn (a b) (! (> a b))))
 (def inc
   (fn (n) (+ n 1)))
 (def dec
@@ -1172,7 +1190,7 @@ fn loadStdlib(withEnv) loadLibSources([
       false
       (if (f? (first xs))
         true
-        (some (rest xs) f?)))))
+        (some? (rest xs) f?)))))
 
 (defn every? (xs f?)
   \'returns false if at least one item in the iterable `xs` does not satisfy the
@@ -1185,12 +1203,15 @@ fn loadStdlib(withEnv) loadLibSources([
         (every? (rest xs) f?)
         false))))
 
-(defn append (xs ys)
-  \'append two iterables together\'
-  (if (empty? xs)
-    ys
-    (conj (first xs)
-          (append (rest xs) ys))))
+(defn append xs
+  \'join one or more iterables together\'
+  (do
+    (defn append-two (xs ys)
+      (if (empty? xs)
+        ys
+        (conj (first xs)
+              (append (rest xs) ys))))
+    (reduce xs () append-two)))
 
 (defn reverse (xs)
   \'reverse the order of an iterable\'
@@ -1237,6 +1258,12 @@ fn loadStdlib(withEnv) loadLibSources([
       (exclude (rest xs) f?)
       (conj (first xs)
             (exclude (rest xs) f?)))))
+
+(defn separate (xs f?)
+  \'sort elements of iterable `xs` into two different iterables depending on the
+  result of the predicate `f?`\'
+  (list (filter xs f?)
+        (exclude xs f?)))
 
 (defn each (xs f)
   \'apply the function `f` to each item in `xs`\'
@@ -1317,7 +1344,7 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn compact (xs)
   \'filter out nil values from the given list, returning a new list\'
-  (exclude xs (is ())))
+  (exclude xs nil?))
 
 (defn partition (xs by)
   \'partition the given iterable by either count or a predicate `by`, returning
@@ -1565,11 +1592,10 @@ fn loadStdlib(withEnv) loadLibSources([
 	'; math library
 
 (def pi
-  \'the circle constant π\'
   3.14159265358979323846264338327950288419716939937510)
+(def π pi)
 
 (def e
-  \'the base of the natural logarithm\'
   2.71828182845904523536028747135266249775724709369995)
 
 (defn // ns
@@ -1826,7 +1852,7 @@ fn loadStdlib(withEnv) loadLibSources([
   (nth xs (rand-int 0 (size xs))))
 
 '
-	'; various data encodings
+	'; various data encodings: ascii
 
 (defn bytes (s)
   (-> s split (map codepoint)))
