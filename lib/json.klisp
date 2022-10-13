@@ -2,10 +2,108 @@
 
 (defn json/serialize (x)
   'serialize a value `x` to a string'
-  ())
+  (do
+    (defn esc (c)
+      (match c
+        ('\t' '\\t')
+        ('\n' '\\n')
+        ('\r' '\\r')
+        ('\f' '\\f')
+        ('"' '\\"')
+        ('\\' '\\\\')
+        (c)))
+    (defn escape (s)
+      (do
+        (def max (len s))
+        (defn sub (i acc)
+          (if (= i max)
+            acc
+            (sub (+ i 1) (<< acc (esc (char-at s i))))))
+        (sub 0 '')))
+    (match (type x)
+      ; TODO: replace intentional occurrences of () with nil
+      (,string (str '"' (escape x) '"'))
+      (,symbol (str '"' (escape (str x)) '"'))
+      (,int (str x))
+      (,float (str x))
+      (,bool (str x))
+      (,list (if (comp? x)
+             (str '{'
+                  (-> x
+                      (map (fn (cell)
+                             (str '"'
+                                  (escape (str (car cell)))
+                                  '":'
+                                  (json/serialize (cdr cell)))))
+                      (join ','))
+                  '}')
+             (str '['
+                  (-> x
+                      (map json/serialize)
+                      (join ','))
+                  ']')))
+      ('null'))))
 
 (defn json/parse (s)
   'parse out a value from the string `s`. Returns the symbol "error" instead on
   any syntax errors.'
-  ())
+  (do
+    (defn Reader (s)
+      (do
+        (defmut index 0)
+        (defmut err? false)
+        (defn next ()
+          (setm! index (+ (getm index) 1))
+          (default (char-at s (- (getm index) 1)) ''))
+        (defn peek ()
+          (default (char-at s (getm index)) ''))
+        (defn next-word (n)
+          (if (> (+ (getm index) n) (len s))
+            (do
+              (setm! index (len s))
+              ())
+            (do
+              (def idx (getm index))
+              (def word (gets s idx (+ idx n)))
+              (setm! index (+ idx n))
+              word)))
+        ; fast-forward through whitespace
+        (defn forward ()
+          (do
+            (defn -forward ()
+              (when (space? (peek))
+                (do
+                  (setm! index (+ (getm index) 1))
+                  (-forward))))
+            (-forward)))
+        (comp ,next next
+              ,peek peek
+              ,forward forward
+              ,next-word next-word
+              ,done? (fn ()
+                       (>= (getm index (len s))))
+              ,err! (fn ()
+                      (do
+                        (setm! err? true)
+                        ,error))
+              ,err? (fn () (getm err?)))))
+    (defn parse-null (r)
+      ())
+    (defn parse-string (r)
+      ())
+    (defn parse-number (r)
+      ())
+    (defn parse-true (r)
+      ())
+    (defn parse-false (r)
+      ())
+    (defn parse-list (r)
+      ())
+    (defn parse-object (r)
+      ())
+    (defn -parse-reader (r)
+      ())
+    (-> s
+        (Reader)
+        (-parse-reader))))
 

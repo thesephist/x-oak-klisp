@@ -15,6 +15,10 @@
                 (-comp (cddr items))))))
     (-comp terms)))
 
+(defn comp? (x)
+  (& (list? x)
+     (every? x list?)))
+
 (defn getc (cp k v)
   'recursive value lookup by key'
   (if (nil? cp)
