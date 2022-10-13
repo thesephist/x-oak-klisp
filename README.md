@@ -133,7 +133,9 @@ Lastly, there are a handful of built-in functions that let Klisp programs intera
 
 Everything is managed with the [Oak CLI](https://oaklang.org/) and the `build.oak` build script.
 
-- Format source files: `oak fmt klisp.oak build.oak --fix`
-- Install to `/usr/local/bin/klisp`: `oak build.oak`
-- Run tests: `klisp test.klisp`
+- Build to `./klisp`: `make build` or just `make`
+- Install to `/usr/local/bin/klisp`: `make install`
+- Build and run the interactive Klisp REPL: `make run`
+- Run tests: `make test` or `make t`
+- Format Oak source files: `make fmt` or `make f`
 

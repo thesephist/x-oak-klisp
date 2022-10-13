@@ -5,10 +5,13 @@ str := import('str')
 fmt := import('fmt')
 fs := import('fs')
 path := import('path')
+cli := import('cli')
 
-OakCLI := args().0
+Cli := cli.parse()
+
+OakCLI := Cli.exe
 BundlePath := 'amalgamated_klisp.oak'
-InstallPath := '/usr/local/bin/klisp'
+InstallPath := Cli.opts.path |> std.default('klisp')
 
 fn escapeAsOakString(s) s |> std.map(fn(c) if c {
 	'\\' -> '\\\\'
