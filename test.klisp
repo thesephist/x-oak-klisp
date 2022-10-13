@@ -52,6 +52,19 @@
       (list-of 5 (constantly-3)))
     (list 3 3 3 3 3))
 
+  (deftest 'default that does not take fallback'
+    (default 10 420)
+    10)
+  (deftest 'default that takes fallback'
+    (default () 420)
+    420)
+  (deftest 'chained defaults'
+    (-> ()
+        (default ())
+        (default (list))
+        (default 100))
+    100)
+
   (deftest 'range, 1 arg'
     (range 10)
     (list 0 1 2 3 4 5 6 7 8 9))

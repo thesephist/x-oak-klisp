@@ -104,7 +104,7 @@
     (quasiquote
       (if (= (unquote name) ())
         (def (unquote name) (unquote val))
-        ()))))
+        (unquote name)))))
 
 (def loop
   (macro (n body)
