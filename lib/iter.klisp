@@ -1,8 +1,8 @@
 ; iterator and sequence functions
 
 (defn base-iterator (seq)
-  'returns an empty string for strings, () for lists'
-  (if (list? seq) () ''))
+  'returns an empty string for strings, nil for lists'
+  (if (list? seq) nil ''))
 
 (defn empty? (seq)
   'reports whether a given iterable is empty'
@@ -130,7 +130,7 @@
         ys
         (conj (first xs)
               (append (rest xs) ys))))
-    (reduce xs () append-two)))
+    (reduce xs nil append-two)))
 
 (defn reverse (xs)
   'reverse the order of an iterable'
@@ -262,7 +262,7 @@
   (do
     (default f (if (list? xs) list +))
     (if (| (empty? xs) (empty? ys))
-      ()
+      nil
       (cons (f (first xs) (first ys))
             (zip (rest xs) (rest ys) f)))))
 
@@ -301,7 +301,7 @@
                              (drop xs (size first-half))))))
                  (defn -partition (xs f)
                    (if (empty? xs)
-                     ()
+                     nil
                      (do
                        (def cut (cut-by xs f))
                        (def first-half (car cut))

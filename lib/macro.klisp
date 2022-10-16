@@ -15,17 +15,17 @@
     'a map implementation used for implementing macros, not meant to be used
     externally. For a supported "map" implementation, see map in lib/iter.'
     (if (nil? xs)
-      ()
+      nil
       (cons (f (car xs))
             (map-list (cdr xs) f)))))
 
 (def when
   (macro (cndn body)
-    (list ,if cndn body ())))
+    (list ,if cndn body nil)))
 
 (def unless
   (macro (cndn body)
-    (list ,if cndn () body)))
+    (list ,if cndn nil body)))
 
 (def let
   (macro terms
@@ -68,11 +68,11 @@
     ((def -list
        (fn (items)
          (if (nil? items)
-           ()
+           nil
            (cons ,cons
                  (cons (car items)
                        (cons (-list (cdr items))
-                             ()))))))
+                             nil))))))
      items)))
 
 (def quasiquote
@@ -102,7 +102,7 @@
   (macro (name val)
     '(default name value)'
     (quasiquote
-      (if (= (unquote name) ())
+      (if (= (unquote name) nil)
         (def (unquote name) (unquote val))
         (unquote name)))))
 
@@ -117,7 +117,7 @@
       (let (break-symb (gensym))
         (quasiquote
           (do
-            (def broken-with ,(()))
+            (def broken-with (list nil))
             (defn loop-body (i break)
               (if (| (= i (unquote n))
                      (= (def ret (unquote body))
@@ -141,7 +141,7 @@
                (do
                  (unquote (cons ,do body))
                  ((unquote -while-f)))
-               ()))))))))
+               nil))))))))
 
 (def defn
   (macro (name . rest)
@@ -161,7 +161,7 @@
     ((def -cond
        (fn (terms)
          (if (nil? terms)
-           ()
+           nil
            (if (nil? (cdar terms))
              (caar terms)
              (quasiquote
@@ -192,7 +192,7 @@
       (def -match
         (fn (terms)
           (if (nil? terms)
-            ()
+            nil
             (if (nil? (cdar terms))
               (caar terms)
               (quasiquote
@@ -297,7 +297,7 @@
     (cons ,do
           (cons (cons ,print terms)
                 (cons ,(print '\n')
-                      ())))))
+                      nil)))))
 
 (def comment
   (macro terms

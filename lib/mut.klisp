@@ -2,7 +2,7 @@
 
 (defmacro defmut (name val)
   (quasiquote
-    (def (unquote name) (cons (unquote val) ()))))
+    (def (unquote name) (cons (unquote val) nil))))
 
 (defn getm (mut)
   (car mut))

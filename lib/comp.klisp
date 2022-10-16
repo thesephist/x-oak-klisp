@@ -9,7 +9,7 @@
     (def -comp
       (fn (items)
         (if (nil? items)
-          ()
+          nil
           (list ,cons
                 (list ,cons (car items) (cadr items))
                 (-comp (cddr items))))))

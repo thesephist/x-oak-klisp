@@ -23,9 +23,13 @@
                           (let
                             (name (name-test t))
                             (do
+                              ; pre-compute log-line so there is no delay
+                              ; between clear-line! and logging the test name
+                              (def log-line (str '(' (inc i) '/' tests-count ')'
+                                                 ' '
+                                                 name))
                               (clear-line!)
-                              (print (str '(' (inc i) '/' tests-count ')')
-                                     name)
+                              (print log-line)
                               (def result ((nth t 2)))
                               (def expected ((nth t 3)))
                               (if (= result expected)

@@ -99,7 +99,7 @@
           (sub pfs
                m
                (inc pf)))))
-    (reverse (sub () n 2))))
+    (reverse (sub nil n 2))))
 
 ; naive factorize
 (defn factors (n)
@@ -130,7 +130,7 @@
 (def min
   (fn (xs)
     (if (nil? xs)
-      ()
+      nil
       (reduce xs
               (car xs)
               (fn (a b)
@@ -139,7 +139,7 @@
 (def max
   (fn (xs)
     (if (nil? xs)
-      ()
+      nil
       (reduce xs
               (car xs)
               (fn (a b)

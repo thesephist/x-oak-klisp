@@ -17,7 +17,7 @@ set lispwords+=quote,def,do,if,fn,macro
 set lispwords+=def,defn,defmacro,defmut,deftestgroup,deftest,when,unless,let,when-let,if-let,quasiquote,loop,while,match,partial
 
 " booleans
-syntax keyword klispBoolean true false
+syntax keyword klispBoolean true false nil
 highlight link klispBoolean Boolean
 
 " numbers should be consumed first by identifiers, so comes before

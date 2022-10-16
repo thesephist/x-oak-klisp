@@ -34,13 +34,13 @@
       ,(2))
     (deftest 'cddr'
       (cddr ,((1 2) (3 4)))
-      ())
+      nil)
 
     (deftest 'function?'
       (every? (list car caar cond) function?)
       true)
     (deftest 'list?'
-      (every? (list () (list 1) (list 1 2)) list?)
+      (every? (list nil (list 1) (list 1 2)) list?)
       true)
 
     (deftest 'is'
@@ -97,11 +97,11 @@
       (default 10 420)
       10)
     (deftest 'default that takes fallback'
-      (default () 420)
+      (default nil 420)
       420)
     (deftest 'chained defaults'
-      (-> ()
-          (default ())
+      (-> nil
+          (default nil)
           (default (list))
           (default 100))
       100)
@@ -200,14 +200,14 @@
   (deftestgroup 'iter'
     (deftest 'base-iterator list'
       (base-iterator (list 1 2 3))
-      ())
+      nil)
     (deftest 'base-iterator string'
       (base-iterator 'hello')
       '')
 
     (deftest 'first empty list'
-      (first ())
-      ())
+      (first nil)
+      nil)
     (deftest 'first list'
       (first (list 10 20 30))
       10)
@@ -219,8 +219,8 @@
       'L')
 
     (deftest 'rest empty list'
-      (rest ())
-      ())
+      (rest nil)
+      nil)
     (deftest 'rest list'
       (rest (list 10 20 30))
       (list 20 30))
@@ -252,10 +252,10 @@
       3)
     (deftest 'nth of list, too low'
       (nth (nat 5) -2)
-      ())
+      nil)
     (deftest 'nth of list, too high'
       (nth (nat 5) 10)
-      ())
+      nil)
 
     (deftest 'nth! of list'
       (let (l (list 1 2 3 4 5))
@@ -271,7 +271,7 @@
       'ApXle')
 
     (deftest 'last of empty list'
-      (last ()) ())
+      (last nil) nil)
     (deftest 'last of empty string'
       (last '') '')
     (deftest 'last of list'
@@ -405,7 +405,7 @@
             'fourth' 4))
 
     (deftest 'compact'
-      (compact (list 1 () 3 5 () 4 ()))
+      (compact (list 1 nil 3 5 nil 4 nil))
       (list 1 3 5 4))
 
     (deftest 'partition by id'
@@ -584,7 +584,7 @@
   (deftestgroup 'comp'
     (deftest 'empty constructor'
       (comp)
-      ())
+      nil)
     (deftest 'constructor'
       (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
       ,((1 . 2)
@@ -595,10 +595,10 @@
       (-> (comp 1 200 3 400 5 600)
           (getc 3))
       400)
-    (deftest 'getc defaults to ()'
+    (deftest 'getc defaults to nil'
       (-> (comp 1 200 3 400 5 600)
           (getc 10))
-      ())
+      nil)
     (deftest 'setc'
       (-> (comp 1 200 3 400 5 600)
           (setc 10 1000)

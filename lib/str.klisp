@@ -166,7 +166,7 @@
 (defn trim-start (s prefix)
   (match prefix
     ('' s)
-    (() (trim-start-space s))
+    (nil (trim-start-space s))
     ((trim-start-non-empty s prefix))))
 
 (defn trim-end-space (s)
@@ -191,7 +191,7 @@
 (defn trim-end (s suffix)
   (match suffix
     ('' s)
-    (() (trim-end-space s))
+    (nil (trim-end-space s))
     ((trim-end-non-empty s suffix))))
 
 (defn trim (s part)

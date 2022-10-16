@@ -16,26 +16,26 @@
     (if x false true)))
 (def &
   (macro terms
-    (if (= terms ())
+    (if (= terms nil)
       ,true
       (cons ,if
             (cons (car terms)
                   (cons (cons ,& (cdr terms))
-                        (cons ,false ())))))))
+                        (cons ,false nil)))))))
 (def |
   (macro terms
-    (if (= terms ())
+    (if (= terms nil)
       ,false
       (cons ,if
             (cons (car terms)
                   (cons ,true
                         (cons (cons ,| (cdr terms))
-                              ())))))))
+                              nil)))))))
 (def ^
   (macro terms
     (cons ,!
           (cons (cons ,= terms)
-                ()))))
+                nil))))
 (def != ^)
 (def <<
   (fn (x y)
@@ -45,15 +45,15 @@
       (do
         (def -<<
           (fn (x)
-            (if (= x ())
-              (cons y ())
+            (if (= x nil)
+              (cons y nil)
               (cons (car x)
                     (-<< (cdr x) y)))))
         (-<< x y)))))
 
 ; type assertions
 (def nil?
-  (fn (x) (= x ())))
+  (fn (x) (= x nil)))
 (def zero?
   (fn (x) (= x 0)))
 (def int?
@@ -72,7 +72,7 @@
   (fn (x) (= (type x) ,function)))
 (def list?
   (fn (x)
-    (| (= x ())
+    (| (= x nil)
        (= (type x) ,list))))
 
 ; identity
@@ -126,12 +126,12 @@
             (if (< start end)
               (cons start
                     (-range (+ start step) end step))
-              ()))
+              nil))
           (fn (start end step)
             (if (> start end)
               (cons start
                     (-range (+ start step) end step))
-              ()))))
+              nil))))
       (if (nil? step)
         (if (nil? end)
           (-range 0 start 1)

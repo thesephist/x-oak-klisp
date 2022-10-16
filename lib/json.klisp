@@ -21,7 +21,6 @@
             (sub (+ i 1) (<< acc (esc (char-at s i))))))
         (sub 0 '')))
     (match (type x)
-      ; TODO: replace intentional occurrences of () with nil
       (,string (str '"' (escape x) '"'))
       (,symbol (str '"' (escape (str x)) '"'))
       (,int (str x))
@@ -61,7 +60,7 @@
           (if (> (+ (getm index) n) (len s))
             (do
               (setm! index (len s))
-              ())
+              nil)
             (do
               (def idx (getm index))
               (def word (gets s idx (+ idx n)))

@@ -383,6 +383,7 @@ fn eval(L, env) if type(L) {
 
 Env := {
 	// constants
+	'nil': LispNull
 	'true': true
 	'false': false
 
@@ -435,6 +436,8 @@ Env := {
 	'rand': makeNative(rand)
 	'time': makeNative(time)
 	'nanotime': makeNative(nanotime)
+	'wait': makeNative(fn(L) wait(float(L.0)))
+	'exit': makeNative(fn(L) exit(int(L.0)))
 	'args': makeNative(fn(_) {
 		fn makeList(xs) if len(xs) {
 			0 -> ?
@@ -631,27 +634,27 @@ fn loadStdlib(withEnv) loadLibSources([
     (if x false true)))
 (def &
   (macro terms
-    (if (= terms ())
+    (if (= terms nil)
       ,true
       (cons ,if
             (cons (car terms)
                   (cons (cons ,& (cdr terms))
-                        (cons ,false ())))))))
-
+                        (cons ,false nil)))))))
 (def |
   (macro terms
-    (if (= terms ())
+    (if (= terms nil)
       ,false
       (cons ,if
             (cons (car terms)
                   (cons ,true
                         (cons (cons ,| (cdr terms))
-                              ())))))))
+                              nil)))))))
 (def ^
   (macro terms
     (cons ,!
           (cons (cons ,= terms)
-                ()))))
+                nil))))
+(def != ^)
 (def <<
   (fn (x y)
     (if (= (type x) ,string)
@@ -660,16 +663,15 @@ fn loadStdlib(withEnv) loadLibSources([
       (do
         (def -<<
           (fn (x)
-            (if (= x ())
-              (cons y ())
+            (if (= x nil)
+              (cons y nil)
               (cons (car x)
                     (-<< (cdr x) y)))))
         (-<< x y)))))
-(def != ^)
 
 ; type assertions
 (def nil?
-  (fn (x) (= x ())))
+  (fn (x) (= x nil)))
 (def zero?
   (fn (x) (= x 0)))
 (def int?
@@ -688,7 +690,7 @@ fn loadStdlib(withEnv) loadLibSources([
   (fn (x) (= (type x) ,function)))
 (def list?
   (fn (x)
-    (| (= x ())
+    (| (= x nil)
        (= (type x) ,list))))
 
 ; identity
@@ -742,12 +744,12 @@ fn loadStdlib(withEnv) loadLibSources([
             (if (< start end)
               (cons start
                     (-range (+ start step) end step))
-              ()))
+              nil))
           (fn (start end step)
             (if (> start end)
               (cons start
                     (-range (+ start step) end step))
-              ()))))
+              nil))))
       (if (nil? step)
         (if (nil? end)
           (-range 0 start 1)
@@ -775,17 +777,17 @@ fn loadStdlib(withEnv) loadLibSources([
     \'a map implementation used for implementing macros, not meant to be used
     externally. For a supported "map" implementation, see map in lib/iter.\'
     (if (nil? xs)
-      ()
+      nil
       (cons (f (car xs))
             (map-list (cdr xs) f)))))
 
 (def when
   (macro (cndn body)
-    (list ,if cndn body ())))
+    (list ,if cndn body nil)))
 
 (def unless
   (macro (cndn body)
-    (list ,if cndn () body)))
+    (list ,if cndn nil body)))
 
 (def let
   (macro terms
@@ -828,11 +830,11 @@ fn loadStdlib(withEnv) loadLibSources([
     ((def -list
        (fn (items)
          (if (nil? items)
-           ()
+           nil
            (cons ,cons
                  (cons (car items)
                        (cons (-list (cdr items))
-                             ()))))))
+                             nil))))))
      items)))
 
 (def quasiquote
@@ -854,17 +856,17 @@ fn loadStdlib(withEnv) loadLibSources([
           (map-list (fn () (unquote f)))))))
 
 (def do-times
-  (macro terms
+  (macro (n body)
     (cons ,do
-          (list-of (car terms) (list (cadr terms))))))
+          (list-of n body))))
 
 (def default
   (macro (name val)
     \'(default name value)\'
     (quasiquote
-      (if (= (unquote name) ())
+      (if (= (unquote name) nil)
         (def (unquote name) (unquote val))
-        ()))))
+        (unquote name)))))
 
 (def loop
   (macro (n body)
@@ -877,7 +879,7 @@ fn loadStdlib(withEnv) loadLibSources([
       (let (break-symb (gensym))
         (quasiquote
           (do
-            (def broken-with ,(()))
+            (def broken-with (list nil))
             (defn loop-body (i break)
               (if (| (= i (unquote n))
                      (= (def ret (unquote body))
@@ -901,7 +903,7 @@ fn loadStdlib(withEnv) loadLibSources([
                (do
                  (unquote (cons ,do body))
                  ((unquote -while-f)))
-               ()))))))))
+               nil))))))))
 
 (def defn
   (macro (name . rest)
@@ -921,7 +923,7 @@ fn loadStdlib(withEnv) loadLibSources([
     ((def -cond
        (fn (terms)
          (if (nil? terms)
-           ()
+           nil
            (if (nil? (cdar terms))
              (caar terms)
              (quasiquote
@@ -952,7 +954,7 @@ fn loadStdlib(withEnv) loadLibSources([
       (def -match
         (fn (terms)
           (if (nil? terms)
-            ()
+            nil
             (if (nil? (cdar terms))
               (caar terms)
               (quasiquote
@@ -1057,7 +1059,7 @@ fn loadStdlib(withEnv) loadLibSources([
     (cons ,do
           (cons (cons ,print terms)
                 (cons ,(print \'\\n\')
-                      ())))))
+                      nil)))))
 
 (def comment
   (macro terms
@@ -1082,8 +1084,8 @@ fn loadStdlib(withEnv) loadLibSources([
 	'; iterator and sequence functions
 
 (defn base-iterator (seq)
-  \'returns an empty string for strings, () for lists\'
-  (if (list? seq) () \'\'))
+  \'returns an empty string for strings, nil for lists\'
+  (if (list? seq) nil \'\'))
 
 (defn empty? (seq)
   \'reports whether a given iterable is empty\'
@@ -1211,7 +1213,7 @@ fn loadStdlib(withEnv) loadLibSources([
         ys
         (conj (first xs)
               (append (rest xs) ys))))
-    (reduce xs () append-two)))
+    (reduce xs nil append-two)))
 
 (defn reverse (xs)
   \'reverse the order of an iterable\'
@@ -1223,6 +1225,17 @@ fn loadStdlib(withEnv) loadLibSources([
                         acc)
                   (rest xs))))
     (-reverse (base-iterator xs) xs)))
+
+(defn enumerate (xs)
+  \'return an iterable of pairs `(i x)` where `i` counts up from 0, and `x`
+  comes from `xs`; resembles Python\\\'s enumerate() builtin\'
+  (do
+    (defn -enumerate (xs i)
+      (if (empty? xs)
+        nil
+        (conj (list i (first xs))
+              (-enumerate (rest xs) (+ i 1)))))
+    (-enumerate xs 0)))
 
 (defn map (xs f)
   \'return an iterable that results from applying `f` to each item in `xs`\'
@@ -1332,7 +1345,7 @@ fn loadStdlib(withEnv) loadLibSources([
   (do
     (default f (if (list? xs) list +))
     (if (| (empty? xs) (empty? ys))
-      ()
+      nil
       (cons (f (first xs) (first ys))
             (zip (rest xs) (rest ys) f)))))
 
@@ -1371,7 +1384,7 @@ fn loadStdlib(withEnv) loadLibSources([
                              (drop xs (size first-half))))))
                  (defn -partition (xs f)
                    (if (empty? xs)
-                     ()
+                     nil
                      (do
                        (def cut (cut-by xs f))
                        (def first-half (car cut))
@@ -1555,7 +1568,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn trim-start (s prefix)
   (match prefix
     (\'\' s)
-    (() (trim-start-space s))
+    (nil (trim-start-space s))
     ((trim-start-non-empty s prefix))))
 
 (defn trim-end-space (s)
@@ -1580,7 +1593,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn trim-end (s suffix)
   (match suffix
     (\'\' s)
-    (() (trim-end-space s))
+    (nil (trim-end-space s))
     ((trim-end-non-empty s suffix))))
 
 (defn trim (s part)
@@ -1690,7 +1703,7 @@ fn loadStdlib(withEnv) loadLibSources([
           (sub pfs
                m
                (inc pf)))))
-    (reverse (sub () n 2))))
+    (reverse (sub nil n 2))))
 
 ; naive factorize
 (defn factors (n)
@@ -1721,7 +1734,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (def min
   (fn (xs)
     (if (nil? xs)
-      ()
+      nil
       (reduce xs
               (car xs)
               (fn (a b)
@@ -1730,7 +1743,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (def max
   (fn (xs)
     (if (nil? xs)
-      ()
+      nil
       (reduce xs
               (car xs)
               (fn (a b)
@@ -1813,12 +1826,109 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn json/serialize (x)
   \'serialize a value `x` to a string\'
-  ())
+  (do
+    (defn esc (c)
+      (match c
+        (\'\\t\' \'\\\\t\')
+        (\'\\n\' \'\\\\n\')
+        (\'\\r\' \'\\\\r\')
+        (\'\\f\' \'\\\\f\')
+        (\'"\' \'\\\\"\')
+        (\'\\\\\' \'\\\\\\\\\')
+        (c)))
+    (defn escape (s)
+      (do
+        (def max (len s))
+        (defn sub (i acc)
+          (if (= i max)
+            acc
+            (sub (+ i 1) (<< acc (esc (char-at s i))))))
+        (sub 0 \'\')))
+    (match (type x)
+      (,string (str \'"\' (escape x) \'"\'))
+      (,symbol (str \'"\' (escape (str x)) \'"\'))
+      (,int (str x))
+      (,float (str x))
+      (,bool (str x))
+      (,list (if (comp? x)
+             (str \'{\'
+                  (-> x
+                      (map (fn (cell)
+                             (str \'"\'
+                                  (escape (str (car cell)))
+                                  \'":\'
+                                  (json/serialize (cdr cell)))))
+                      (join \',\'))
+                  \'}\')
+             (str \'[\'
+                  (-> x
+                      (map json/serialize)
+                      (join \',\'))
+                  \']\')))
+      (\'null\'))))
 
 (defn json/parse (s)
   \'parse out a value from the string `s`. Returns the symbol "error" instead on
   any syntax errors.\'
-  ())
+  (do
+    (defn Reader (s)
+      (do
+        (defmut index 0)
+        (defmut err? false)
+        (defn next ()
+          (incm! index)
+          (default (char-at s (- (getm index) 1)) \'\'))
+        (defn peek ()
+          (default (char-at s (getm index)) \'\'))
+        (defn next-word (n)
+          (if (> (+ (getm index) n) (len s))
+            (do
+              (setm! index (len s))
+              nil)
+            (do
+              (def idx (getm index))
+              (def word (gets s idx (+ idx n)))
+              (incm! index n)
+              word)))
+        ; fast-forward through whitespace
+        (defn forward ()
+          (do
+            (defn -forward ()
+              (when (space? (peek))
+                (do
+                  (incm! index)
+                  (-forward))))
+            (-forward)))
+        (comp ,next next
+              ,peek peek
+              ,forward forward
+              ,next-word next-word
+              ,done? (fn ()
+                       (>= (getm index (len s))))
+              ,err! (fn ()
+                      (do
+                        (setm! err? true)
+                        ,error))
+              ,err? (fn () (getm err?)))))
+    (defn parse-null (r)
+      ())
+    (defn parse-string (r)
+      ())
+    (defn parse-number (r)
+      ())
+    (defn parse-true (r)
+      ())
+    (defn parse-false (r)
+      ())
+    (defn parse-list (r)
+      ())
+    (defn parse-object (r)
+      ())
+    (defn -parse-reader (r)
+      ())
+    (-> s
+        (Reader)
+        (-parse-reader))))
 
 '
 	'; random library, implementing utilities for working
@@ -1884,11 +1994,15 @@ fn loadStdlib(withEnv) loadLibSources([
     (def -comp
       (fn (items)
         (if (nil? items)
-          ()
+          nil
           (list ,cons
                 (list ,cons (car items) (cadr items))
                 (-comp (cddr items))))))
     (-comp terms)))
+
+(defn comp? (x)
+  (& (list? x)
+     (every? x list?)))
 
 (defn getc (cp k v)
   \'recursive value lookup by key\'
@@ -1930,7 +2044,7 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defmacro defmut (name val)
   (quasiquote
-    (def (unquote name) (cons (unquote val) ()))))
+    (def (unquote name) (cons (unquote val) nil))))
 
 (defn getm (mut)
   (car mut))
@@ -1938,45 +2052,89 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn setm! (mut val)
   (car! mut val))
 
-'
-	'; utilities for writing tests
+(defn incm! (mut val)
+  (do
+    (default val 1)
+    (car! mut (+ (car mut) val))))
 
-(defmacro run-tests terms
-  (quasiquote
-    (let
-      (results (unquote (cons ,list terms)))
-      (passed? cadr)
-      (do
-        (print \'\\n\')
-        (-> results
-            (exclude passed?)
-            (each (fn (r)
-                    (let
-                      (name (car r))
-                      (got (car (cddr r)))
-                      (expected (cadr (cddr r)))
-                      (println (+ name
-                                  \': expected \'
-                                  (->string expected)
-                                  \', got \'
-                                  (->string got)))))))
-        (println (+ (->string (-> results
-                                  (filter passed?)
-                                  size))
-                    \'/\'
-                    (->string (size results)))
-                 \'tests passed.\')))))
+'
+	'; utilities for writing and running test suites
+
+(defn test/flatten-tree (test-tree)
+  (-> test-tree
+      (reduce (list)
+              (fn (acc tree-node)
+                (if (= ,test (car tree-node))
+                  (<< acc tree-node)
+                  (append acc (test/flatten-tree tree-node)))))))
+
+(defn test/run (test-tree)
+  (let
+    (tests (test/flatten-tree test-tree))
+    (tests-count (size tests))
+    (clear-line! (fn ()
+                   (print \'\\x1b[2K\\x1b[0G\')))
+    (name-test (fn (t)
+                 (-> (nth t 1)
+                     (join \' → \'))))
+    (passes (-> tests
+                (enumerate)
+                (filter (fn ((i t))
+                          (let
+                            (name (name-test t))
+                            (do
+                              ; pre-compute log-line so there is no delay
+                              ; between clear-line! and logging the test name
+                              (def log-line (str \'(\' (inc i) \'/\' tests-count \')\'
+                                                 \' \'
+                                                 name))
+                              (clear-line!)
+                              (print log-line)
+                              (def result ((nth t 2)))
+                              (def expected ((nth t 3)))
+                              (if (= result expected)
+                                true
+                                (do
+                                  (clear-line!)
+                                  (println (str name
+                                                \': expected \' expected
+                                                \', got \' result))
+                                  false))))))))
+    (do
+      (clear-line!)
+      (println (str (size passes) \'/\' tests-count
+                    \' tests passed.\'))
+      (when (!= tests-count (size passes))
+        (exit 1)))))
+
+(defn test/make-test-group (name tests)
+  (-> tests
+      (map (fn (t)
+             (do
+               (nth! t 1
+                     (cons name (nth t 1)))
+               t)))))
+
+(defn test/make-test (name body-fn expected-fn)
+  (list ,test
+        (list name)
+        body-fn
+        expected-fn))
+
+(defmacro run-tests tests
+  (list ,test/run
+        (cons ,list tests)))
+
+(defmacro deftestgroup (name . tests)
+  (list ,test/make-test-group
+        name
+        (cons ,list tests)))
 
 (defmacro deftest (name body expected)
   (quasiquote
-    (let
-      (got (unquote body))
-      (passed? (= got (unquote expected)))
-      (do
-        (print (if passed? \'.\' \'!\')) ; progress indicator
-        (list (unquote name)
-              passed?
-              got (unquote expected))))))
+    (test/make-test (unquote name)
+                    (fn () (unquote body))
+                    (fn () (unquote expected)))))
 
 '
 ], withEnv)

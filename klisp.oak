@@ -383,6 +383,7 @@ fn eval(L, env) if type(L) {
 
 Env := {
 	// constants
+	'nil': LispNull
 	'true': true
 	'false': false
 
