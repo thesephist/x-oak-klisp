@@ -552,7 +552,7 @@
           12 1))
 
   ; mut
-  (deftest 'defmut defines a mutable value'
+  (deftest 'defmut, getm, setm!'
     (do
       (defmut my-val 10)
       (def original (getm my-val))
@@ -560,6 +560,18 @@
       (def final (getm my-val))
       (list original final))
     (list 10 42))
+  (deftest 'incm! with an argument'
+    (do
+      (defmut my-val 10)
+      (incm! my-val 20)
+      (getm my-val))
+    30)
+  (deftest 'incm! with default argument'
+    (do
+      (defmut my-val 10)
+      (incm! my-val)
+      (getm my-val))
+    11)
 
   ; json
   (deftest 'json/serialize nil'
