@@ -1293,10 +1293,11 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn take (xs n)
   \'return an iterable containing only the first `n` items of `xs`\'
-  (if (| (empty? xs) (zero? n))
-    (base-iterator xs)
-    (conj (first xs)
-          (take (rest xs) (dec n)))))
+  (let (n (max (list n 0)))
+    (if (| (empty? xs) (zero? n))
+      (base-iterator xs)
+      (conj (first xs)
+            (take (rest xs) (dec n))))))
 
 (defn take-while (xs f?)
   \'return an iterable containing only the first consecutive items of `xs` that
@@ -1310,9 +1311,10 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn drop (xs n)
   \'return an iterable containing all items after the first `n` of `xs`\'
-  (if (| (empty? xs) (zero? n))
-    xs
-    (drop (rest xs) (dec n))))
+  (let (n (max (list n 0)))
+    (if (| (empty? xs) (zero? n))
+      xs
+      (drop (rest xs) (dec n)))))
 
 (defn drop-while (xs f?)
   \'return an iterable excluding the first consecutive items of `xs` that

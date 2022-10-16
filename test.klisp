@@ -395,7 +395,87 @@
       (size 'abcde')
       5)
 
-    ; TODO: test more iter library functions!
+    (deftest 'take from list'
+      (take (nat 10) 5)
+      (nat 5))
+    (deftest 'take from list beyond end'
+      (take (nat 5) 10)
+      (nat 5))
+    (deftest 'take from string'
+      (take 'hello world' 7)
+      'hello w')
+    (deftest 'take from string beyond end'
+      (take 'hello' 7)
+      'hello')
+    (deftest 'take-while from list'
+      (take-while (list 2 4 6 10 11 12 13) even?)
+      (list 2 4 6 10))
+    (deftest 'take-while from string'
+      (take-while 'HELLoWoRLD!' upper?)
+      'HELL')
+    (deftest 'drop from list'
+      (drop (nat 10) 5)
+      (list 6 7 8 9 10))
+    (deftest 'drop from list through end'
+      (drop (nat 5) 10)
+      (list))
+    (deftest 'drop from string'
+      (drop 'hello world' 7)
+      'orld')
+    (deftest 'drop from string through end'
+      (drop 'hello' 7)
+      '')
+    (deftest 'drop-while from list'
+      (drop-while (list 2 4 6 10 11 12 13) even?)
+      (list 11 12 13))
+    (deftest 'drop-while from string'
+      (drop-while 'HELLoWoRLD!' upper?)
+      'oWoRLD!')
+
+    (deftest 'slice into list'
+      (slice (nat 10) 3 6)
+      (list 4 5 6))
+    (deftest 'slice into list out of bounds'
+      (slice (nat 5) -2 100)
+      (nat 5))
+    (deftest 'slice into list inverted range'
+      (slice (nat 10) 5 2)
+      (list))
+    (deftest 'slice into string'
+      (slice 'hello world' 4 8)
+      'o wo')
+    (deftest 'slice into string out of bounds'
+      (slice 'hello world' -2 100)
+      'hello world')
+    (deftest 'slice into string inverted range'
+      (slice 'hello world' 5 2)
+      '')
+
+    (deftest 'flatten empty list'
+      (flatten (list))
+      (list))
+    (deftest 'flatten list'
+      (flatten (list (list 1 2)
+                     (list 1 2 3)
+                     (list 4 5 (list 5 6) 10)))
+      (list 1 2 1 2 3 4 5 (list 5 6) 10))
+
+    (deftest 'zip lists'
+      (zip (nat 5)
+           (split 'hello'))
+      (list (list 1 'h')
+            (list 2 'e')
+            (list 3 'l')
+            (list 4 'l')
+            (list 5 'o')))
+    (deftest 'zip strings'
+      (zip 'hello' 'world')
+      (list 'hw' 'eo' 'lr' 'll' 'od'))
+    (deftest 'zip lists with custom predicate'
+      (zip (list 1 2 3 4 5)
+           (list 50 40 30 20 10)
+           *)
+      (list 50 80 90 80 50))
 
     (deftest 'interleave'
       (interleave (list 'first' 'second' 'third' 'fourth') (nat 10))
@@ -404,6 +484,9 @@
             'third' 3
             'fourth' 4))
 
+    (deftest 'compact a nil list'
+      (compact (list))
+      (list))
     (deftest 'compact'
       (compact (list 1 nil 3 5 nil 4 nil))
       (list 1 3 5 4))
@@ -416,7 +499,15 @@
       (quote ((1 1 1 2 2) (5 5 5 5 5) (5 2 2))))
     (deftest 'partition by predicate'
       (partition (list 1 2 3 6 9 5 2 6 120 4) (partial factor? ? 3))
-      (quote ((1 2) (3 6 9) (5 2) (6 120) (4)))))
+      (quote ((1 2) (3 6 9) (5 2) (6 120) (4))))
+
+    (deftest 'uniq by id'
+      (uniq (list 1 1 1 2 2 3 3 3 2 2 2 5))
+      (list 1 2 3 2 5))
+    (deftest 'uniq by predicate'
+      (uniq (list 1 3 5 7 2 4 6 9 1)
+            even?)
+      (list 1 2 9)))
 
   (deftestgroup 'str'
     (deftest 'char-at'
