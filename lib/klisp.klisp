@@ -22,7 +22,6 @@
             (cons (car terms)
                   (cons (cons ,& (cdr terms))
                         (cons ,false ())))))))
-
 (def |
   (macro terms
     (if (= terms ())
@@ -37,6 +36,7 @@
     (cons ,!
           (cons (cons ,= terms)
                 ()))))
+(def != ^)
 (def <<
   (fn (x y)
     (if (= (type x) ,string)
@@ -50,7 +50,6 @@
               (cons (car x)
                     (-<< (cdr x) y)))))
         (-<< x y)))))
-(def != ^)
 
 ; type assertions
 (def nil?

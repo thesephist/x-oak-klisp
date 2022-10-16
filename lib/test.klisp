@@ -1,39 +1,74 @@
-; utilities for writing tests
+; utilities for writing and running test suites
 
-(defmacro run-tests terms
-  (quasiquote
-    (let
-      (results (unquote (cons ,list terms)))
-      (passed? cadr)
-      (do
-        (print '\n')
-        (-> results
-            (exclude passed?)
-            (each (fn (r)
-                    (let
-                      (name (car r))
-                      (got (car (cddr r)))
-                      (expected (cadr (cddr r)))
-                      (println (+ name
-                                  ': expected '
-                                  (->string expected)
-                                  ', got '
-                                  (->string got)))))))
-        (println (+ (->string (-> results
-                                  (filter passed?)
-                                  size))
-                    '/'
-                    (->string (size results)))
-                 'tests passed.')))))
+(defn test/flatten-tree (test-tree)
+  (-> test-tree
+      (reduce (list)
+              (fn (acc tree-node)
+                (if (= ,test (car tree-node))
+                  (<< acc tree-node)
+                  (append acc (test/flatten-tree tree-node)))))))
+
+(defn test/run (test-tree)
+  (let
+    (tests (test/flatten-tree test-tree))
+    (tests-count (size tests))
+    (clear-line! (fn ()
+                   (print '\x1b[2K\x1b[0G')))
+    (name-test (fn (t)
+                 (-> (nth t 1)
+                     (join ' → '))))
+    (passes (-> tests
+                (enumerate)
+                (filter (fn ((i t))
+                          (let
+                            (name (name-test t))
+                            (do
+                              (clear-line!)
+                              (print (str '(' (inc i) '/' tests-count ')')
+                                     name)
+                              (def result ((nth t 2)))
+                              (def expected ((nth t 3)))
+                              (if (= result expected)
+                                true
+                                (do
+                                  (clear-line!)
+                                  (println (str name
+                                                ': expected ' expected
+                                                ', got ' result))
+                                  false))))))))
+    (do
+      (clear-line!)
+      (println (str (size passes) '/' tests-count
+                    ' tests passed.'))
+      (when (!= tests-count (size passes))
+        (exit 1)))))
+
+(defn test/make-test-group (name tests)
+  (-> tests
+      (map (fn (t)
+             (do
+               (nth! t 1
+                     (cons name (nth t 1)))
+               t)))))
+
+(defn test/make-test (name body-fn expected-fn)
+  (list ,test
+        (list name)
+        body-fn
+        expected-fn))
+
+(defmacro run-tests tests
+  (list ,test/run
+        (cons ,list tests)))
+
+(defmacro deftestgroup (name . tests)
+  (list ,test/make-test-group
+        name
+        (cons ,list tests)))
 
 (defmacro deftest (name body expected)
   (quasiquote
-    (let
-      (got (unquote body))
-      (passed? (= got (unquote expected)))
-      (do
-        (print (if passed? '.' '!')) ; progress indicator
-        (list (unquote name)
-              passed?
-              got (unquote expected))))))
+    (test/make-test (unquote name)
+                    (fn () (unquote body))
+                    (fn () (unquote expected)))))
 

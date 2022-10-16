@@ -143,6 +143,17 @@
                   (rest xs))))
     (-reverse (base-iterator xs) xs)))
 
+(defn enumerate (xs)
+  'return an iterable of pairs `(i x)` where `i` counts up from 0, and `x`
+  comes from `xs`; resembles Python\'s enumerate() builtin'
+  (do
+    (defn -enumerate (xs i)
+      (if (empty? xs)
+        nil
+        (conj (list i (first xs))
+              (-enumerate (rest xs) (+ i 1)))))
+    (-enumerate xs 0)))
+
 (defn map (xs f)
   'return an iterable that results from applying `f` to each item in `xs`'
   (if (empty? xs)

@@ -8,6 +8,7 @@ b: build
 # install CLI
 install:
 	oak build.oak --path /usr/local/bin/klisp
+	cp klisp.vim ~/.vim/syntax/klisp.vim
 
 # run CLI after building an executable
 run: build

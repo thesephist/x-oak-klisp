@@ -435,6 +435,8 @@ Env := {
 	'rand': makeNative(rand)
 	'time': makeNative(time)
 	'nanotime': makeNative(nanotime)
+	'wait': makeNative(fn(L) wait(float(L.0)))
+	'exit': makeNative(fn(L) exit(int(L.0)))
 	'args': makeNative(fn(_) {
 		fn makeList(xs) if len(xs) {
 			0 -> ?

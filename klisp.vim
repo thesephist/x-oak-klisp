@@ -14,7 +14,7 @@ syntax sync fromstart
 " lisp-style indentation
 set lisp
 set lispwords+=quote,def,do,if,fn,macro
-set lispwords+=def,defn,defmacro,defmut,deftest,when,unless,let,when-let,if-let,quasiquote,loop,while,match,partial
+set lispwords+=def,defn,defmacro,defmut,deftestgroup,deftest,when,unless,let,when-let,if-let,quasiquote,loop,while,match,partial
 
 " booleans
 syntax keyword klispBoolean true false
@@ -40,6 +40,7 @@ syntax keyword klispKeyword conj contained
 syntax keyword klispKeyword defn contained
 syntax keyword klispKeyword defmacro contained
 syntax keyword klispKeyword defmut contained
+syntax keyword klispKeyword deftestgroup contained
 syntax keyword klispKeyword deftest contained
 syntax keyword klispKeyword when contained
 syntax keyword klispKeyword unless contained
