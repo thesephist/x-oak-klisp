@@ -94,9 +94,9 @@
           (map-list (fn () (unquote f)))))))
 
 (def do-times
-  (macro terms
+  (macro (n body)
     (cons ,do
-          (list-of (car terms) (list (cadr terms))))))
+          (list-of n body))))
 
 (def default
   (macro (name val)

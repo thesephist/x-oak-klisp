@@ -10,3 +10,8 @@
 (defn setm! (mut val)
   (car! mut val))
 
+(defn incm! (mut val)
+  (do
+    (default val 1)
+    (car! mut (+ (car mut) val))))
+
