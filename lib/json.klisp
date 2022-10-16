@@ -53,7 +53,7 @@
         (defmut index 0)
         (defmut err? false)
         (defn next ()
-          (setm! index (+ (getm index) 1))
+          (incm! index)
           (default (char-at s (- (getm index) 1)) ''))
         (defn peek ()
           (default (char-at s (getm index)) ''))
@@ -65,7 +65,7 @@
             (do
               (def idx (getm index))
               (def word (gets s idx (+ idx n)))
-              (setm! index (+ idx n))
+              (incm! index n)
               word)))
         ; fast-forward through whitespace
         (defn forward ()
@@ -73,7 +73,7 @@
             (defn -forward ()
               (when (space? (peek))
                 (do
-                  (setm! index (+ (getm index) 1))
+                  (incm! index)
                   (-forward))))
             (-forward)))
         (comp ,next next
