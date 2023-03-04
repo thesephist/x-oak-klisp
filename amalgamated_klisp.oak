@@ -11,7 +11,6 @@
 	map: map
 	find: find
 	reduce: reduce
-	reverse: reverse
 	fromHex: fromHex
 } := import('std')
 {
@@ -26,7 +25,16 @@ fs := import('fs')
 oakPrint := print
 
 // Oak list -> Klisp list
-fn listify(xs) xs |> reverse() |> reduce(?, fn(L, x) [x, L])
+fn listify(xs) {
+	fn sub(acc, i) if i {
+		-1 -> acc
+		_ -> sub(
+			[xs.(i), acc]
+			i - 1
+		)
+	}
+	sub(?, len(xs) - 1)
+}
 
 // like std.map, but works on lisp lists
 fn mapSexpr(L, f) {
@@ -1128,11 +1136,13 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn nth (xs i)
   \'returns the `i`th item of the iterable `xs`, or the base iterator of the
   iterable if there is not sufficient length\'
-  (if (not-pos? i)
-    (if (zero? i)
-      (first xs)
-      (base-iterator xs))
-    (nth (rest xs) (dec i))))
+  (if (list? xs)
+    (if (not-pos? i)
+      (if (zero? i)
+        (first xs)
+        (base-iterator xs))
+      (nth (rest xs) (dec i)))
+    (gets xs i (inc i))))
 
 (defn nth! (xs i x)
   \'mutates in place the `i`th item of the iterable `xs` to be `x`\'
@@ -1963,11 +1973,22 @@ fn loadStdlib(withEnv) loadLibSources([
   \'returns a randomly picked item from the list xs\'
   (nth xs (rand-int 0 (size xs))))
 
+(defn rand-alphanumeric (n)
+  (-> (default n 1)
+      (list-of (rand-choice \'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789\'))
+      join))
+
+(defn uid ()
+  (rand-alphanumeric 16))
+
 '
 	'; various data encodings: ascii
 
 (defn bytes (s)
   (-> s split (map codepoint)))
+
+(defn from-bytes (bs)
+  (-> bs (map char) join))
 
 (defn int->hex (n)
   (if (< n 16)

@@ -28,3 +28,11 @@
   'returns a randomly picked item from the list xs'
   (nth xs (rand-int 0 (size xs))))
 
+(defn rand-alphanumeric (n)
+  (-> (default n 1)
+      (list-of (rand-choice 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'))
+      join))
+
+(defn uid ()
+  (rand-alphanumeric 16))
+

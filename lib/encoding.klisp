@@ -3,6 +3,9 @@
 (defn bytes (s)
   (-> s split (map codepoint)))
 
+(defn from-bytes (bs)
+  (-> bs (map char) join))
+
 (defn int->hex (n)
   (if (< n 16)
     (char-at '0123456789abcdef' n)
