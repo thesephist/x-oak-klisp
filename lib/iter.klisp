@@ -45,11 +45,13 @@
 (defn nth (xs i)
   'returns the `i`th item of the iterable `xs`, or the base iterator of the
   iterable if there is not sufficient length'
-  (if (not-pos? i)
-    (if (zero? i)
-      (first xs)
-      (base-iterator xs))
-    (nth (rest xs) (dec i))))
+  (if (list? xs)
+    (if (not-pos? i)
+      (if (zero? i)
+        (first xs)
+        (base-iterator xs))
+      (nth (rest xs) (dec i)))
+    (gets xs i (inc i))))
 
 (defn nth! (xs i x)
   'mutates in place the `i`th item of the iterable `xs` to be `x`'
