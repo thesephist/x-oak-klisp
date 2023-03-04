@@ -11,7 +11,6 @@
 	map: map
 	find: find
 	reduce: reduce
-	reverse: reverse
 	fromHex: fromHex
 } := import('std')
 {
@@ -26,7 +25,16 @@ fs := import('fs')
 oakPrint := print
 
 // Oak list -> Klisp list
-fn listify(xs) xs |> reverse() |> reduce(?, fn(L, x) [x, L])
+fn listify(xs) {
+	fn sub(acc, i) if i {
+		-1 -> acc
+		_ -> sub(
+			[xs.(i), acc]
+			i - 1
+		)
+	}
+	sub(?, len(xs) - 1)
+}
 
 // like std.map, but works on lisp lists
 fn mapSexpr(L, f) {
