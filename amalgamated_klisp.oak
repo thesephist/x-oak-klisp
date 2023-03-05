@@ -22,6 +22,7 @@
 	endsWith?: endsWith?
 } := import('str')
 fs := import('fs')
+path := import('path')
 
 // alias print, because it will be overridden later
 oakPrint := print
@@ -279,6 +280,35 @@ fn setv(env, name, v) env.(name) := if type(v) {
 	_ -> v
 }
 
+fn getEnvMeta(env, metaKey) if im := env.(metaKey) {
+	? -> if e := env.'\x00env' {
+		? -> {
+			println('No scope metadata "' + env.metaKey + '" found in env')
+			exit(1)
+		}
+		_ -> getEnvMeta(e, metaKey)
+	}
+	_ -> im
+}
+
+fn getImportMap(env) getEnvMeta(env, '\x00importmap')
+fn getEnvPath(env) getEnvMeta(env, '\x00path')
+
+fn getImportEnv(importPath, env) {
+	importMap := getImportMap(env)
+	if cachedEnv := importMap.(importPath) {
+		? -> {
+			fs.readFile(importPath) |>
+				read() |>
+				must() |>
+				eval(envi := { '\x00env': Env, '\x00path': path.dir(importPath) })
+			importMap.(importPath) := envi
+			envi
+		}
+		_ -> cachedEnv
+	}
+}
+
 fn makeFn(f, L) [false, f, L]
 fn makeMacro(f, L) [true, f, L]
 fn makeNative(f) makeFn(f, ?)
@@ -371,18 +401,15 @@ fn eval(L, env) if type(L) {
 			}
 		}
 		:import -> {
-			path := eval(L.(1).0, env)
+			importPath := eval(L.(1).0, env)
 			prefix := if L.(1).1 {
-				? -> path
+				? -> importPath
 				_ -> eval(L.(1).(1).0, env)
 			}
-			fs.readFile(path + '.klisp') |>
-				read() |>
-				must() |>
-				eval(envi := { '\x00env': Env })
-			envi |> entries() |> each(
-				fn(pair) if pair.0 != '\x00env' -> setv(env, prefix + '/' + pair.0, pair.1)
-			)
+			path.resolve(importPath + '.klisp', getEnvPath(env)) |>
+				getImportEnv(env) |>
+				entries() |>
+				each(fn(pair) if pair.0 != '\x00env' -> setv(env, prefix + '/' + pair.0, pair.1))
 		}
 		_ -> {
 			funcStub := eval(L.0, env)
@@ -401,6 +428,10 @@ fn eval(L, env) if type(L) {
 }
 
 Env := {
+	// meta
+	'\x00path': path.resolve('.')
+	'\x00importmap': {}
+
 	// constants
 	'nil': LispNull
 	'true': true
@@ -2187,8 +2218,8 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defmacro import-as (symbol-path alias)
   (quasiquote
-    (import (str (unquote symbol-path))
-            (str (unquote alias)))))
+    (import (unquote (str symbol-path))
+            (unquote (str alias)))))
 
 '
 ], withEnv)
@@ -2199,7 +2230,7 @@ with loadStdlib() fn(env) {
 		-1 -> default(2)
 		_ -> idx
 	}
-	if path := args().(lispFileIdx) {
+	if filePath := args().(lispFileIdx) {
 		? -> {
 			println('Klisp interpreter v0.1-oak.')
 			incomplete := ''
@@ -2228,9 +2259,9 @@ with loadStdlib() fn(env) {
 			}
 			sub()
 		}
-		_ -> with fs.readFile(path) fn(file) if file {
-			? -> println('error: could not read', path)
-			_ -> file |> read() |> eval(env)
+		_ -> with fs.readFile(filePath) fn(file) if file {
+			? -> println('error: could not read', filePath)
+			_ -> file |> read() |> eval(env.'\x00path' := path.dir(filePath))
 		}
 	}
 }
