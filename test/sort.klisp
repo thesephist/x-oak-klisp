@@ -1,0 +1,28 @@
+(def tests
+  (deftestgroup 'sort'
+    (deftest 'mergesort'
+      (-> (list-of 25 (rand-int 20))
+          mergesort
+          ((partial apply <= ?)))
+      true)
+    (deftest 'quicksort'
+      (-> (list-of 25 (rand-int 20))
+          quicksort
+          ((partial apply <= ?)))
+      true)
+    (deftest 'sort'
+      (-> (list-of 25 (rand-int 20))
+          sort
+          ((partial apply <= ?)))
+      true)
+    (deftest 'sort by predicate'
+      (-> (list 34 26 125 69 243 105)
+          (sort (partial % ? 100)))
+      (list 105 125 26 34 243 69))
+    (deftest 'sort string'
+      (sort 'Hello World')
+      ' HWdellloor')
+    (deftest 'sort string by predicate'
+      (sort 'Hello World' lower)
+      ' deHllloorW')))
+

@@ -1,0 +1,130 @@
+(def tests
+  (deftestgroup 'macros'
+    (deftest 'single let decl'
+      (let (a 10)
+        (+ a a))
+      20)
+    (deftest 'multiple chained let decls'
+      (let
+        (a 10)
+        (b 20)
+        (c (+ a b))
+        (* c (- b a)))
+      300)
+    (deftest 'list-of'
+      (list-of 5 (list 1 2))
+      (list (list 1 2)
+            (list 1 2)
+            (list 1 2)
+            (list 1 2)
+            (list 1 2)))
+    (deftest 'do-times'
+      (do
+        (defmut x 0)
+        (do-times 10 (incm! x 2))
+        (getm x))
+      20)
+    (deftest 'default that does not take fallback'
+      (default 10 420)
+      10)
+    (deftest 'default that takes fallback'
+      (default nil 420)
+      420)
+    (deftest 'chained defaults'
+      (-> nil
+          (default nil)
+          (default (list))
+          (default 100))
+      100)
+    (deftest 'loop 0 times'
+      (do
+        (defmut x 0)
+        (loop 0 (incm! x 1))
+        (getm x))
+      0)
+    (deftest 'loop many times'
+      (do
+        (defmut x 0)
+        (loop 50 (incm! x 2))
+        (getm x))
+      100)
+    (deftest 'loop with i, break'
+      (do
+        (defmut x 0)
+        (loop 100 (if (= i 50)
+                    (break)
+                    (incm! x 2)))
+        (getm x))
+      100)
+    (deftest 'loop with break with value'
+      (do
+        (defmut x 0)
+        (loop 100 (if (= i 60)
+                    (break (* 2 i))
+                    (incm! x 2))))
+      120)
+    (deftest 'while loop'
+      (do
+        (defmut x 100)
+        (defmut y 1)
+        (while (> (getm x) 50)
+          (incm! x -1)
+          (incm! y 3))
+        (list (getm x)
+              (getm y)))
+      (list 50 151))
+    (deftest 'cond'
+      (let (n 12)
+        (cond
+          ((= n 10) (+ n 10))
+          ((= n 12) (+ n 12))
+          ((= n 14) (+ n 14))))
+      24)
+    (deftest 'cond with default case'
+      (let (n 100)
+        (cond
+          ((= n 10) (+ n 10))
+          ((= n 12) (+ n 12))
+          ((= n 14) (+ n 14))
+          ((+ n 16))))
+      116)
+    (deftest 'match'
+      (let (n 100)
+        (match n
+          (0 'zero')
+          (100 'hundred')
+          (200 'two hundred')
+          'three hundred'))
+      'hundred')
+    (deftest 'match with default case'
+      (let (n 1000)
+        (0 'zero')
+        (100 'hundred')
+        (200 'two hundred')
+        'three hundred')
+      'three hundred')
+    (deftest '-> (thread-first)'
+      (let (square (fn (n)
+                     (* n n)))
+        (-> (nat 5)
+            (map square)
+            (sum)))
+      55)
+    (deftest '->> (thread-last)'
+      (->> (nat 5)
+           (sum)
+           ((fn (n) (* 2 n)))
+           (- 100)
+           (/ 280 2))
+      2)
+    (deftest 'as->'
+      (let (square (fn (n)
+                     (* n n)))
+        (as-> me!
+              (nat 5)
+              (sum me!)
+              (+ me! me!)
+              (- me! 15)
+              (* 2 me! me!)))
+      450)))
+

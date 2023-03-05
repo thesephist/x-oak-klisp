@@ -42,6 +42,9 @@ syntax keyword klispKeyword defmacro contained
 syntax keyword klispKeyword defmut contained
 syntax keyword klispKeyword deftestgroup contained
 syntax keyword klispKeyword deftest contained
+syntax keyword klispKeyword import contained
+syntax keyword klispKeyword import-from contained
+syntax keyword klispKeyword import-as contained
 syntax keyword klispKeyword when contained
 syntax keyword klispKeyword unless contained
 syntax keyword klispKeyword let contained

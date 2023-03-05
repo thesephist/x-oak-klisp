@@ -1,0 +1,43 @@
+(def tests
+  (deftestgroup 'comp'
+    (deftest 'empty constructor'
+      (comp)
+      nil)
+    (deftest 'constructor'
+      (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
+      ,((1 . 2)
+        (a . b)
+        ('hi' . 'hello')
+        ((1 2) . (4 5))))
+    (deftest 'getc'
+      (-> (comp 1 200 3 400 5 600)
+          (getc 3))
+      400)
+    (deftest 'getc defaults to nil'
+      (-> (comp 1 200 3 400 5 600)
+          (getc 10))
+      nil)
+    (deftest 'setc'
+      (-> (comp 1 200 3 400 5 600)
+          (setc 10 1000)
+          (getc 10))
+      1000)
+    (deftest 'keys'
+      (-> (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
+          keys)
+      (list 1 ,a 'hi' (list 1 2)))
+    (deftest 'values'
+      (-> (comp 1 2 ,a ,b 'hi' 'hello' (list 1 2) (list 4 5))
+          values)
+      (list 2 ,b 'hello' (list 4 5)))
+    (deftest 'freq'
+      (-> (list 1 1 1 2 2 5 8 8 8 8 8 8 10 12)
+          freq
+          (sort car))
+      (comp 1 3
+            2 2
+            5 1
+            8 6
+            10 1
+            12 1))))
+

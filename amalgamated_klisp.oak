@@ -10,7 +10,9 @@
 	slice: slice
 	map: map
 	find: find
+	each: each
 	reduce: reduce
+	entries: entries
 	fromHex: fromHex
 } := import('std')
 {
@@ -258,20 +260,20 @@ fn must(result) if type(result) {
 LispNull := fn {}
 LispEmpty := fn {}
 
-fn getv(env, name, err?) if v := env.(string(name)) {
+fn getv(env, name, err?) if v := env.(name) {
 	? -> if e := env.'\x00env' {
 		? -> {
 			if err? -> println('Unbound name "' + string(name) + '"')
 			?
 		}
-		_ -> getv(e, string(name), err?)
+		_ -> getv(e, name, err?)
 	}
 	LispNull -> ?
 	LispEmpty -> _
 	_ -> v
 }
 
-fn setv(env, name, v) env.(string(name)) := if type(v) {
+fn setv(env, name, v) env.(name) := if type(v) {
 	:null -> LispNull
 	:empty -> LispEmpty
 	_ -> v
@@ -282,8 +284,8 @@ fn makeMacro(f, L) [true, f, L]
 fn makeNative(f) makeFn(f, ?)
 
 fn eval(L, env) if type(L) {
+	:atom -> getv(env, string(L), true)
 	:list -> if L.0 {
-		:quote -> L.(1).0
 		:def -> {
 			name := L.(1).0
 			val := eval(L.(1).(1).0, env)
@@ -300,18 +302,13 @@ fn eval(L, env) if type(L) {
 			}
 			sub(L.1)
 		}
-		:if -> {
-			cond := L.(1).0
-			conseq := L.(1).(1).0
-			altern := L.(1).(1).(1).0
-			eval(
-				if eval(cond, env) {
-					true -> conseq
-					_ -> altern
-				}
-				env
-			)
-		}
+		:if -> eval(
+			if eval(L.(1).0, env) {
+				true -> L.(1).(1).0
+				_ -> L.(1).(1).(1).0
+			}
+			env
+		)
 		:fn -> {
 			params := L.(1).0
 			body := if L.(1).(1).1 {
@@ -335,6 +332,7 @@ fn eval(L, env) if type(L) {
 				}
 			), L)
 		}
+		:quote -> L.(1).0
 		:macro -> {
 			params := L.(1).0
 			body := if L.(1).(1).1 {
@@ -362,7 +360,7 @@ fn eval(L, env) if type(L) {
 			expr := eval(L.(1).0, env)
 			if {
 				expr = ? -> expr
-				type(expr.0) = :atom -> if funcStub := getv(env, expr.0, false) {
+				type(expr.0) = :atom -> if funcStub := getv(env, string(expr.0), false) {
 					[_, _, _] -> if funcStub.0 {
 						true -> eval(funcStub.1, env)(expr.1)
 						_ -> expr
@@ -371,6 +369,20 @@ fn eval(L, env) if type(L) {
 				}
 				_ -> expr
 			}
+		}
+		:import -> {
+			path := eval(L.(1).0, env)
+			prefix := if L.(1).1 {
+				? -> path
+				_ -> eval(L.(1).(1).0, env)
+			}
+			fs.readFile(path + '.klisp') |>
+				read() |>
+				must() |>
+				eval(envi := { '\x00env': Env })
+			envi |> entries() |> each(
+				fn(pair) if pair.0 != '\x00env' -> setv(env, prefix + '/' + pair.0, pair.1)
+			)
 		}
 		_ -> {
 			funcStub := eval(L.0, env)
@@ -384,7 +396,6 @@ fn eval(L, env) if type(L) {
 			}
 		}
 	}
-	:atom -> getv(env, L, true)
 	:string -> clone(L)
 	_ -> L
 }
@@ -596,27 +607,17 @@ fn print(L) if type(L) {
 	_ -> string(L)
 }
 
-fn loadLibs(libs, withEnv) {
-	fn sub(i, env) if i {
-		len(libs) -> withEnv(env)
-		_ -> with fs.readFile(libs.(i)) fn(file) {
-			file |> read() |> must() |> eval(env)
-			sub(i + 1, env)
-		}
-	}
-	sub(0, Env |> clone())
-}
-
 fn loadLibSources(libs, withEnv) {
 	fn sub(i, env) if i {
-		len(libs) -> withEnv(env)
+		len(libs) -> withEnv({ '\x00env': env })
 		_ -> {
 			file := libs.(i)
 			file |> read() |> must() |> eval(env)
 			sub(i + 1, env)
 		}
 	}
-	sub(0, Env |> clone())
+	// NOTE: core libraries are loaded into the root env
+	sub(0, Env)
 }
 
 fn loadStdlib(withEnv) loadLibSources([
@@ -1793,6 +1794,23 @@ fn loadStdlib(withEnv) loadLibSources([
   (do
     (default pred id)
     (def vpred (map xs pred))
+    (defn containing-cons (xs i)
+      (if (zero? i)
+        xs
+        (containing-cons (cdr xs) (dec i))))
+    (if (list? xs)
+      (defn swap (xs i j)
+        (do
+          (def ic (containing-cons xs i))
+          (def jc (containing-cons xs j))
+          (def tmp (car ic))
+          (car! ic (car jc))
+          (car! jc tmp)))
+      (defn swap (xs i j)
+        (do
+          (def tmp (nth xs i))
+          (nth! xs i (nth xs j))
+          (nth! xs j tmp))))
     (defn partition (xs lo hi)
       (let (pivot (nth vpred lo))
         (do
@@ -1810,12 +1828,8 @@ fn loadStdlib(withEnv) loadLibSources([
               (def j (rsub j))
               (if (< i j)
                 (do
-                  (def tmp (nth xs i))
-                  (def tmpPred (nth vpred i))
-                  (nth! xs i (nth xs j))
-                  (nth! xs j tmp)
-                  (nth! vpred i (nth vpred j))
-                  (nth! vpred j tmpPred)
+                  (swap xs i j)
+                  (swap vpred i j)
                   (sub (inc i) (dec j)))
                 j)))
           (sub lo hi))))
@@ -2160,11 +2174,28 @@ fn loadStdlib(withEnv) loadLibSources([
                     (fn () (unquote expected)))))
 
 '
+	'; import macros
+
+(defmacro import-from (symbol-path symbols)
+  (cons
+    ,do
+    (cons
+      (list ,import (str symbol-path))
+      (-> (default symbols ())
+          (map (fn (sym)
+                 (list ,def sym (string->symbol (str symbol-path \'/\' sym)))))))))
+
+(defmacro import-as (symbol-path alias)
+  (quasiquote
+    (import (str (unquote symbol-path))
+            (str (unquote alias)))))
+
+'
 ], withEnv)
 
 // CLI
 with loadStdlib() fn(env) {
-	lispFileIdx := if idx := args() |> find(fn(arg) arg |> endsWith?('.klisp') | arg |> endsWith?('.lisp')) {
+	lispFileIdx := if idx := args() |> find(fn(arg) arg |> endsWith?('.klisp')) {
 		-1 -> default(2)
 		_ -> idx
 	}

@@ -1,0 +1,104 @@
+(def tests
+  (deftestgroup 'str'
+    (deftest 'char-at'
+      (char-at 'hello world' 5)
+      ' ')
+
+    (deftest 'upper?'
+      (separate 'abcABCeFd123_. ' upper?)
+      (list 'ABCF' 'abced123_. '))
+    (deftest 'lower?'
+      (separate 'abcABCeFd123_. ' lower?)
+      (list 'abced' 'ABCF123_. '))
+    (deftest 'digit?'
+      (separate 'abcABCeFd123_. ' digit?)
+      (list '123' 'abcABCeFd_. '))
+    (deftest 'space?'
+      (separate ' \t\n\r\fabc._' space?)
+      (list ' \t\n\r\f' 'abc._'))
+    (deftest 'letter?'
+      (separate 'abcABCeFd123_. ' letter?)
+      (list 'abcABCeFd' '123_. '))
+    (deftest 'word?'
+      (separate 'abcABCeFd123_. ' word?)
+      (list 'abcABCeFd123' '_. '))
+
+    (deftest 'join with no joiner'
+      (join (list 'rose' 'jennie' 'lisa' 'jisoo'))
+      'rosejennielisajisoo')
+    (deftest 'join with joiner'
+      (join (list 'rose' 'jennie' 'lisa' 'jisoo') ', ')
+      'rose, jennie, lisa, jisoo')
+
+    (deftest 'str'
+      (str 1 2 'three' ,symbolname (list 1 2 3))
+      '12threesymbolname(1 2 3)')
+
+    (deftest 'starts-with? -> true'
+      (starts-with? 'hello' 'hell')
+      true)
+    (deftest 'starts-with? -> false'
+      (starts-with? 'hello' 'good')
+      false)
+    (deftest 'ends-with? -> true'
+      (ends-with? 'hello' 'llo')
+      true)
+    (deftest 'ends-with? -> false'
+      (ends-with? 'hello' 'bye')
+      false)
+
+    (deftest 'str-index'
+      (str-index 'hello world' 'world')
+      6)
+    (deftest 'str-index -> -1'
+      (str-index 'hello world' 'goodbye')
+      -1)
+
+    (deftest 'cut'
+      (cut 'hello world how are you' ' ')
+      (list 'hello' 'world how are you'))
+    (deftest 'cut with multi-char delimiter'
+      (cut 'hello worlld' 'll')
+      (list 'he' 'o worlld'))
+
+    (deftest 'upper'
+      (upper 'abcABCeFd123_. ')
+      'ABCABCEFD123_. ')
+    (deftest 'lower'
+      (lower 'abcABCeFd123_. ')
+      'abcabcefd123_. ')
+
+    (deftest 'replace'
+      (replace 'hello world' 'l' '_ll_')
+      'he_ll__ll_o wor_ll_d')
+
+    (deftest 'split'
+      (split 'hello world' 'l')
+      (list 'he' '' 'o wor' 'd'))
+
+    (deftest 'pad-start'
+      (pad-start '25.0' 8 '234')
+      '234225.0')
+    (deftest 'pad-end'
+      (pad-end '25.0' 8 '234')
+      '25.02342')
+
+    (deftest 'trim-start'
+      (trim-start 'abcabcabdef' 'abc')
+      'abdef')
+    (deftest 'trim-start spaces'
+      (trim-start '   \thi  \n  ')
+      'hi  \n  ')
+    (deftest 'trim-end'
+      (trim-end 'abcefdefdefdef' 'def')
+      'abcef')
+    (deftest 'trim-end spaces'
+      (trim-end '   \thi  \n  ')
+      '   \thi')
+    (deftest 'trim'
+      (trim '--------hi--------' '---')
+      '--hi--')
+    (deftest 'trim spaces'
+      (trim '   \thi  \n  ')
+      'hi')))
+

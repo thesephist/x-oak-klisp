@@ -1,0 +1,53 @@
+(def tests
+  (deftestgroup 'json'
+    (deftest 'serialize nil'
+      (json/serialize nil)
+      'null')
+    (deftest 'serialize empty'
+      (json/serialize _)
+      'null')
+    (deftest 'serialize simple string'
+      (json/serialize 'Hello, World!')
+      '"Hello, World!"')
+    (deftest 'serialize complex string'
+      (json/serialize '("what\'s up?"\\123)')
+      '"(\\"what\'s up?\\"\\\\123)"')
+    (deftest 'serialize symbol'
+      (json/serialize (quote this-is-a-symbol))
+      '"this-is-a-symbol"')
+    (deftest 'serialize symbol with special chars'
+      (json/serialize (string->symbol '("what\'s up?"\\123)'))
+      '"(\\"what\'s up?\\"\\\\123)"')
+    (deftest 'serialize ints'
+      (-> (list 1 2 3)
+          (map json/serialize))
+      (list '1' '2' '3'))
+    (deftest 'serialize floats'
+      (-> (list 3.14 -0.003 +100000.2)
+          (map json/serialize))
+      (list '3.14' '-0.003' '100000.2'))
+    (deftest 'serialize bools'
+      (-> (list true false)
+          (map json/serialize))
+      (list 'true' 'false'))
+    (deftest 'serialize lists'
+      (json/serialize (list 1 ,a (list 10 20 30)))
+      '[1,"a",[10,20,30]]')
+    (deftest 'serialize comps'
+      (-> (list (comp)
+                (comp 1 2
+                      3 4)
+                (comp ,a (list 1 2)
+                      (list 3 4) 34))
+          (map json/serialize))
+      (list 'null' ; NOTE: empty comp is serialized as null
+            '{"1":2,"3":4}'
+            '{"a":[1,2],"(3 4)":34}'))
+    (deftest 'serialize everything combined'
+      (-> (comp 1 2
+                'three' (list 4 5 6)
+                ,hi (comp ,a ,b
+                          ,c ,d))
+          (json/serialize))
+      '{"1":2,"three":[4,5,6],"hi":{"a":"b","c":"d"}}')))
+

@@ -1,0 +1,313 @@
+(def tests
+  (deftestgroup 'iter'
+    (deftest 'base-iterator list'
+      (base-iterator (list 1 2 3))
+      nil)
+    (deftest 'base-iterator string'
+      (base-iterator 'hello')
+      '')
+
+    (deftest 'first empty list'
+      (first nil)
+      nil)
+    (deftest 'first list'
+      (first (list 10 20 30))
+      10)
+    (deftest 'first empty string'
+      (first '')
+      '')
+    (deftest 'first string'
+      (first 'Lisp')
+      'L')
+
+    (deftest 'rest empty list'
+      (rest nil)
+      nil)
+    (deftest 'rest list'
+      (rest (list 10 20 30))
+      (list 20 30))
+    (deftest 'rest empty string'
+      (rest '')
+      '')
+    (deftest 'rest string'
+      (rest 'Lisp')
+      'isp')
+
+    (deftest 'conj onto string'
+      (conj 'L' 'isp')
+      'Lisp')
+    (deftest 'conj onto list'
+      (conj 10 (list 20 30 40))
+      (list 10 20 30 40))
+
+    (deftest 'nth of string'
+      (nth 'Apple' 2)
+      'p')
+    (deftest 'nth of string, too low'
+      (nth 'Apple' -2)
+      '')
+    (deftest 'nth of string, too high'
+      (nth 'Apple' 10)
+      '')
+    (deftest 'nth of list'
+      (nth (nat 5) 2)
+      3)
+    (deftest 'nth of list, too low'
+      (nth (nat 5) -2)
+      nil)
+    (deftest 'nth of list, too high'
+      (nth (nat 5) 10)
+      nil)
+
+    (deftest 'nth! of list'
+      (let (l (list 1 2 3 4 5))
+        (do
+          (nth! l 3 100)
+          l))
+      (list 1 2 3 100 5))
+    (deftest 'nth! of string'
+      (let (s 'Apple')
+        (do
+          (nth! s 2 'X')
+          s))
+      'ApXle')
+
+    (deftest 'last of empty list'
+      (last nil) nil)
+    (deftest 'last of empty string'
+      (last '') '')
+    (deftest 'last of list'
+      (last (list 1 2 3 4 5)) 5)
+    (deftest 'last of string'
+      (last 'hello world') 'd')
+
+    (deftest 'index into list'
+      (index (list 'sun' 'rain' 'cloud' 'mist' 'snow') 'mist')
+      3)
+    (deftest 'index into list, not found'
+      (index (list 'sun' 'rain' 'cloud' 'mist' 'snow') 'fire')
+      -1)
+    (deftest 'index into string'
+      (index 'LOVE DIVE' 'I')
+      6)
+    (deftest 'index into string, not found'
+      (index 'LOVE DIVE' 'X')
+      -1)
+
+    (deftest 'every? that passes'
+      (every? (list 2 4 6 200 10) even?)
+      true)
+    (deftest 'every? that fails'
+      (every? (list 2 4 6 200 13) even?)
+      false)
+    (deftest 'some? that passes'
+      (some? (list 2 4 6 200 13) even?)
+      true)
+    (deftest 'some? that fails'
+      (some? (list 1 3 5 199 13) even?)
+      false)
+
+    (deftest 'append lists'
+      (append (range 5) (range 3))
+      (list 0 1 2 3 4 0 1 2))
+    (deftest 'append multiple lists'
+      (append (nat 3) (list 'a' 'b' 'c') ,(do whatever))
+      (list 1 2 3 'a' 'b' 'c' ,do ,whatever))
+    (deftest 'append strings'
+      (append 'hello' 'world')
+      'helloworld')
+    (deftest 'append multiple strings'
+      (append 'rose' 'jennie' 'lisa' 'jisoo')
+      'rosejennielisajisoo')
+
+    (deftest 'reverse a list'
+      (reverse (range 5))
+      (list 4 3 2 1 0))
+    (deftest 'reverse a string'
+      (reverse 'alphabet')
+      'tebahpla')
+
+    (deftest 'enumerate a list'
+      (enumerate (nat 5))
+      (list (list 0 1)
+            (list 1 2)
+            (list 2 3)
+            (list 3 4)
+            (list 4 5)))
+    (deftest 'enumerate a string'
+      (enumerate 'enum')
+      (list (list 0 'e')
+            (list 1 'n')
+            (list 2 'u')
+            (list 3 'm')))
+    (deftest 'map a list'
+      (map (nat 5) double)
+      (list 2 4 6 8 10))
+    (deftest 'map a string'
+      (map 'dead' upper)
+      'DEAD')
+    (deftest 'reduce a list'
+      (reduce (nat 5)
+              100
+              +)
+      115)
+    (deftest 'reduce a string'
+      (reduce 'bear'
+              '__'
+              (fn (acc c) (+ acc (upper c) c)))
+      '__BbEeAaRr')
+    (deftest 'filter a list'
+      (filter (nat 10) even?)
+      (list 2 4 6 8 10))
+    (deftest 'filter a string'
+      (filter 'It is SaturdaY!' upper?)
+      'ISY')
+    (deftest 'exclude a list'
+      (exclude (nat 10) even?)
+      (list 1 3 5 7 9))
+    (deftest 'exclude a string'
+      (exclude 'It is SaturdaY!' upper?)
+      't is aturda!')
+    (deftest 'separate a list'
+      (separate (nat 10) even?)
+      (list (list 2 4 6 8 10)
+            (list 1 3 5 7 9)))
+    (deftest 'separate a string'
+      (separate 'It is SaturdaY!' upper?)
+      (list 'ISY'
+            't is aturda!'))
+    (deftest 'each on a list'
+      (do
+        (defmut x 1000)
+        (each (list 2 10 300)
+              (fn (n) (incm! x n)))
+        (getm x))
+      1312)
+    (deftest 'each on a string'
+      (do
+        (defmut x (list 'x' 'y'))
+        (each 'abc'
+              (fn (c) (setm! x (cons c (getm x)))))
+        (getm x))
+      (list 'c' 'b' 'a' 'x' 'y'))
+    (deftest 'size of a list'
+      (size (list ,a ,b ,c ,d ,e))
+      5)
+    (deftest 'size of a string'
+      (size 'abcde')
+      5)
+
+    (deftest 'take from list'
+      (take (nat 10) 5)
+      (nat 5))
+    (deftest 'take from list beyond end'
+      (take (nat 5) 10)
+      (nat 5))
+    (deftest 'take from string'
+      (take 'hello world' 7)
+      'hello w')
+    (deftest 'take from string beyond end'
+      (take 'hello' 7)
+      'hello')
+    (deftest 'take-while from list'
+      (take-while (list 2 4 6 10 11 12 13) even?)
+      (list 2 4 6 10))
+    (deftest 'take-while from string'
+      (take-while 'HELLoWoRLD!' upper?)
+      'HELL')
+    (deftest 'drop from list'
+      (drop (nat 10) 5)
+      (list 6 7 8 9 10))
+    (deftest 'drop from list through end'
+      (drop (nat 5) 10)
+      (list))
+    (deftest 'drop from string'
+      (drop 'hello world' 7)
+      'orld')
+    (deftest 'drop from string through end'
+      (drop 'hello' 7)
+      '')
+    (deftest 'drop-while from list'
+      (drop-while (list 2 4 6 10 11 12 13) even?)
+      (list 11 12 13))
+    (deftest 'drop-while from string'
+      (drop-while 'HELLoWoRLD!' upper?)
+      'oWoRLD!')
+
+    (deftest 'slice into list'
+      (slice (nat 10) 3 6)
+      (list 4 5 6))
+    (deftest 'slice into list out of bounds'
+      (slice (nat 5) -2 100)
+      (nat 5))
+    (deftest 'slice into list inverted range'
+      (slice (nat 10) 5 2)
+      (list))
+    (deftest 'slice into string'
+      (slice 'hello world' 4 8)
+      'o wo')
+    (deftest 'slice into string out of bounds'
+      (slice 'hello world' -2 100)
+      'hello world')
+    (deftest 'slice into string inverted range'
+      (slice 'hello world' 5 2)
+      '')
+
+    (deftest 'flatten empty list'
+      (flatten (list))
+      (list))
+    (deftest 'flatten list'
+      (flatten (list (list 1 2)
+                     (list 1 2 3)
+                     (list 4 5 (list 5 6) 10)))
+      (list 1 2 1 2 3 4 5 (list 5 6) 10))
+
+    (deftest 'zip lists'
+      (zip (nat 5)
+           (split 'hello'))
+      (list (list 1 'h')
+            (list 2 'e')
+            (list 3 'l')
+            (list 4 'l')
+            (list 5 'o')))
+    (deftest 'zip strings'
+      (zip 'hello' 'world')
+      (list 'hw' 'eo' 'lr' 'll' 'od'))
+    (deftest 'zip lists with custom predicate'
+      (zip (list 1 2 3 4 5)
+           (list 50 40 30 20 10)
+           *)
+      (list 50 80 90 80 50))
+
+    (deftest 'interleave'
+      (interleave (list 'first' 'second' 'third' 'fourth') (nat 10))
+      (list 'first' 1
+            'second' 2
+            'third' 3
+            'fourth' 4))
+
+    (deftest 'compact a nil list'
+      (compact (list))
+      (list))
+    (deftest 'compact'
+      (compact (list 1 nil 3 5 nil 4 nil))
+      (list 1 3 5 4))
+
+    (deftest 'partition by id'
+      (partition (list 1 1 1 2 2 5 5 5 5 5 5 2 2))
+      (quote ((1 1 1) (2 2) (5 5 5 5 5 5) (2 2))))
+    (deftest 'partition by count'
+      (partition (list 1 1 1 2 2 5 5 5 5 5 5 2 2) 5)
+      (quote ((1 1 1 2 2) (5 5 5 5 5) (5 2 2))))
+    (deftest 'partition by predicate'
+      (partition (list 1 2 3 6 9 5 2 6 120 4) (partial factor? ? 3))
+      (quote ((1 2) (3 6 9) (5 2) (6 120) (4))))
+
+    (deftest 'uniq by id'
+      (uniq (list 1 1 1 2 2 3 3 3 2 2 2 5))
+      (list 1 2 3 2 5))
+    (deftest 'uniq by predicate'
+      (uniq (list 1 3 5 7 2 4 6 9 1)
+            even?)
+      (list 1 2 9))))
+

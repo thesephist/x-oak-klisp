@@ -1,0 +1,69 @@
+(def langtests
+  (deftestgroup 'core language'
+    (deftest 'basic addition' (+ 2 2) 4)
+    (deftest 'variadic addition' (+ 1 2 3 4 5) 15)
+    (deftest 'basic subtraction' (- 10 5) 5)
+    (deftest 'variadic subtraction' (- 100 50 10 2) 38)
+    (deftest 'basic multiplication' (* 5 8) 40)
+    (deftest 'variadic multiplication' (* 2 3 5 8) 240)
+    (deftest 'basic power' (# 2 10) 1024)
+    (deftest 'variadic power' (# 2 2 3 2) 4096)
+
+    (deftest 'variadic =' (= 2 (+ 1 1) 2 2 2) true)
+    (deftest 'variadic = (inverse)' (= 2 (+ 1 1) 3 2 2) false)
+    (deftest 'variadic <' (< 1 2 6 100 200) true)
+    (deftest 'variadic < (inverse)' (< 1 2 -6 100 200) false)
+    (deftest 'variadic >' (> 200 100 6 2 1) true)
+    (deftest 'variadic > (inverse)' (> 200 100 -6 2 1) false)
+    (deftest 'variadic <=' (<= 1 1 2 5 5 100) true)
+    (deftest 'variadic <= (inverse)' (<= 1 1 2 5 3 100) false)
+    (deftest 'variadic >=' (>= 100 5 5 2 1 1) true)
+    (deftest 'variadic >= (inverse)' (>= 100 4 5 2 1 1) false)))
+
+(def libtests
+  (deftestgroup 'core stdlib'
+    (deftest 'caar'
+      (caar ,((1 2) (3 4)))
+      1)
+    (deftest 'cadr'
+      (cadr ,((1 2) (3 4)))
+      ,(3 4))
+    (deftest 'cdar'
+      (cdar ,((1 2) (3 4)))
+      ,(2))
+    (deftest 'cddr'
+      (cddr ,((1 2) (3 4)))
+      nil)
+
+    (deftest 'function?'
+      (every? (list car caar cond) function?)
+      true)
+    (deftest 'list?'
+      (every? (list nil (list 1) (list 1 2)) list?)
+      true)
+
+    (deftest 'is'
+      (let (is-3 (is 3))
+        (is-3 3))
+      true)
+    (deftest 'constantly'
+      (let (constantly-3 (constantly 3))
+        (list-of 5 (constantly-3)))
+      (list 3 3 3 3 3))
+
+    (deftest 'range, 1 arg'
+      (range 10)
+      (list 0 1 2 3 4 5 6 7 8 9))
+    (deftest 'range, 2 args'
+      (range 5 10)
+      (list 5 6 7 8 9))
+    (deftest 'range, 3 args'
+      (range 5 10 2)
+      (list 5 7 9))
+    (deftest 'range, descending'
+      (range 10 0 -3)
+      (list 10 7 4 1))
+    (deftest 'nat'
+      (nat 12)
+      (range 1 13))))
+

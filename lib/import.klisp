@@ -1,0 +1,16 @@
+; import macros
+
+(defmacro import-from (symbol-path symbols)
+  (cons
+    ,do
+    (cons
+      (list ,import (str symbol-path))
+      (-> (default symbols ())
+          (map (fn (sym)
+                 (list ,def sym (string->symbol (str symbol-path '/' sym)))))))))
+
+(defmacro import-as (symbol-path alias)
+  (quasiquote
+    (import (str (unquote symbol-path))
+            (str (unquote alias)))))
+

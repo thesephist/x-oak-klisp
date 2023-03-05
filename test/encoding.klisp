@@ -1,0 +1,30 @@
+(def tests
+  (deftestgroup 'encoding'
+    (deftest 'bytes of empty string'
+      (bytes '')
+      (list))
+    (deftest 'bytes of string'
+      (bytes 'Hello')
+      (list 72 101 108 108 111))
+    (deftest 'from-bytes of empty list'
+      (from-bytes (list))
+      '')
+    (deftest 'from-bytes of list'
+      (from-bytes (list 72 101 108 108 111 44 32
+                        87 111 114 108 100 33))
+      'Hello, World!')
+
+    (deftest 'int->hex'
+      (-> (list 0 3 10 64 100 255 2022)
+          (map int->hex))
+      (list '0' '3' 'a' '40' '64' 'ff' '7e6'))
+    (deftest 'hex->int'
+      (-> (list '0' '3' 'a' '40' '64' 'ff' '7e6')
+          (map hex->int))
+      (list 0 3 10 64 100 255 2022))
+    (deftest 'int/hex round-trips'
+      (-> (range 2 500 31)
+          (map int->hex)
+          (map hex->int))
+      (range 2 500 31))))
+
