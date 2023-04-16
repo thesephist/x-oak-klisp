@@ -13,7 +13,7 @@ syntax sync fromstart
 
 " lisp-style indentation
 set lisp
-set lispwords+=quote,def,do,if,fn,macro
+set lispwords+=quote,def,do,if,fn,macro,expand,import
 set lispwords+=def,defn,defmacro,defmut,deftestgroup,deftest,when,unless,let,when-let,if-let,quasiquote,loop,while,match,partial
 
 " booleans
@@ -31,6 +31,8 @@ syntax keyword klispKeyword def contained
 syntax keyword klispKeyword if contained
 syntax keyword klispKeyword fn contained
 syntax keyword klispKeyword macro contained
+syntax keyword klispKeyword expand contained
+syntax keyword klispKeyword import contained
 " language builtin forms
 syntax match klispKeywordCadrContainer "\v(car|cdr|first|rest)!?[ ()$]" contains=klispKeywordCadr
 syntax match klispKeywordCadr "\v(car|cdr|first|rest)!?" contained
@@ -61,15 +63,18 @@ syntax keyword klispKeyword cond contained
 syntax keyword klispKeyword match contained
 syntax keyword klispKeyword partial contained
 " type assertions
-syntax match klispKeywordTyContainer "\v\(\s*(nil|int|float|number|bool|\-\>string|symbol|function|list)\??[ ()$]" contains=klispKeywordTy
+syntax match klispKeywordTyContainer "\v\(\s*(nil|int|float|number|bool|string|\-\>string|symbol|function|atom|cons|list)\??[ ()$]" contains=klispKeywordTy
 syntax match klispKeywordTy "\vnil\?" contained
 syntax match klispKeywordTy "\vint\??" contained
 syntax match klispKeywordTy "\vfloat\??" contained
 syntax match klispKeywordTy "\vnumber\?" contained
 syntax match klispKeywordTy "\vbool\??" contained
+syntax match klispKeywordTy "\vstring\??" contained
 syntax match klispKeywordTy "\v\-\>string\??" contained
 syntax match klispKeywordTy "\vsymbol\?" contained
 syntax match klispKeywordTy "\vfunction\?" contained
+syntax match klispKeywordTy "\vatom\??" contained
+syntax match klispKeywordTy "\vcons\??" contained
 syntax match klispKeywordTy "\vlist\??" contained
 highlight link klispKeyword Keyword
 highlight link klispKeywordCadr Keyword
