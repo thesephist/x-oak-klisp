@@ -416,8 +416,7 @@ fn eval(L, env) if type(L) {
 			func := eval(funcStub.1, env)
 			argcs := L.1
 
-			// funcStub.0 reports whether the stub is a macro
-			if funcStub.0 {
+			if funcStub.0 { // reports whether the stub is a macro
 				true -> func(argcs) |> eval(env)
 				_ -> func(argcs |> mapSexpr(fn(x) eval(x, env)))
 			}
@@ -481,19 +480,29 @@ Env := {
 	'sin': makeNative(fn(L) sin(L.0))
 	'cos': makeNative(fn(L) cos(L.0))
 	'tan': makeNative(fn(L) tan(L.0))
+	'asin': makeNative(fn(L) asin(L.0))
+	'acos': makeNative(fn(L) acos(L.0))
+	'atan': makeNative(fn(L) atan(L.0))
+	'log': makeNative(fn(L) log(L.0, L.(1).0))
 	'int': makeNative(fn(L) int(L.0))
 	'float': makeNative(fn(L) float(L.0))
 	'rand': makeNative(rand)
+	'srand': makeNative(fn(L) srand(L.0))
 	'time': makeNative(time)
 	'nanotime': makeNative(nanotime)
 	'wait': makeNative(fn(L) wait(float(L.0)))
 	'exit': makeNative(fn(L) exit(int(L.0)))
 	'args': makeNative(fn(_) {
-		fn makeList(xs) if len(xs) {
-			0 -> ?
-			_ -> [xs.0, makeList(xs |> slice(1))]
-		}
-		makeList(args())
+		args() |> listify()
+	})
+	'env': makeNative(fn(_) {
+		env() |> entries() |> listify()
+	})
+	'exec': makeNative(fn() {
+		cmd := L.0
+		argv := L.(1).0 // TODO: need to reverse-listify
+		stdin := L.(1).(1).0
+		exec(cmd, argv, stdin) |> entries() |> listify()
 	})
 
 	// arithmetic and logical operators
@@ -568,6 +577,9 @@ Env := {
 	})
 
 	// I/O, system
+	'input': makeNative(fn(L) {
+		// TODO: implement
+	})
 	'print': makeNative(fn(L) {
 		output := L.1 |> reduceSexpr(
 			if type(L.0) {
@@ -590,6 +602,18 @@ Env := {
 			fs.writeFile(path, file)
 		_ -> ?
 	})
+	// TODO: consider renaming to e.g. "fs/read", "fs/stat", and these "fs/rm",
+	// "fs/mkdir" for consistency.
+	'rm': makeNative(fn(L) if {
+		// TODO: implement
+		_ -> ?
+	})
+	'mkdir': makeNative(fn(L) if {
+		// TODO: implement
+		_ -> ?
+	})
+	// TODO: consider making open/close/read/write available for lower-level
+	// access, and making fs/read-file, etc. higher level library APIs.
 	'stat-file': makeNative(fn(L) if type(path := L.0) {
 		:string -> {
 			stat := fs.statFile(path)
@@ -612,6 +636,21 @@ Env := {
 			}) |> listify()
 		}
 		_ -> ?
+	})
+	'listen': makeNative(fn(L) {
+		// TODO: implement
+	})
+	'req': makeNative(fn(L) {
+		// TODO: implement
+	})
+
+	// runtime
+	'___runtime_gc': makeNative(___runtime_gc)
+	'___runtime_mem': makeNative(fn(_) {
+		___runtime_mem() |> entries() |> listify()
+	})
+	'___runtime_proc': makeNative(fn(_) {
+		___runtime_proc() |> entries() |> listify()
 	})
 }
 
@@ -728,6 +767,17 @@ fn loadStdlib(withEnv) loadLibSources([
   (fn (x) (= (type x) ,symbol)))
 (def function?
   (fn (x) (= (type x) ,function)))
+(def atom?
+  (fn (x)
+    (| (nil? x)
+       (number? x)
+       (bool? x)
+       (string? x)
+       (symbol? x)
+       (function? x))))
+(def cons?
+  (fn (x)
+    (= (type x) ,list)))
 (def list?
   (fn (x)
     (| (= x nil)
@@ -750,10 +800,10 @@ fn loadStdlib(withEnv) loadLibSources([
   (fn (n) (> n 0)))
 (def neg?
   (fn (n) (< n 0)))
-(def not-neg?
-  (fn (n) (>= n 0)))
 (def not-pos?
   (fn (n) (<= n 0)))
+(def not-neg?
+  (fn (n) (>= n 0)))
 (def abs
   (fn (n)
     (if (neg? n)
@@ -767,7 +817,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (def even?
   (fn (n) (zero? (% n 2))))
 (def odd?
-  (fn (n) (! (even? n))))
+  (fn (n) (zero? (% (+ n 1) 2))))
 (def inc
   (fn (n) (+ n 1)))
 (def dec
@@ -1648,6 +1698,8 @@ fn loadStdlib(withEnv) loadLibSources([
 '
 	'; math library
 
+; TODO: flesh out from Oaklang\'s libmath functions
+
 (def pi
   3.14159265358979323846264338327950288419716939937510)
 (def π pi)
@@ -1663,6 +1715,10 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn sq (n)
   (* n n))
+
+(defn close? (n m epsilon)
+  (< (abs (- n m))
+     (default epsilon 0.00000001)))
 
 (defn hypot (x0 y0 x1 y1)
   (do
@@ -1692,12 +1748,6 @@ fn loadStdlib(withEnv) loadLibSources([
         (if (>= n 0)
           (/ (int (+ (* n order) 0.5)) order)
           (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
-
-(defn even? (n)
-  (zero? (% n 2)))
-
-(defn odd? (n)
-  (= (% n 2) 1))
 
 ; Euclid\'s GCD algorithm
 (defn gcd (a b)
