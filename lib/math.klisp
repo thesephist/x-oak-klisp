@@ -1,5 +1,7 @@
 ; math library
 
+; TODO: flesh out from Oaklang's libmath functions
+
 (def pi
   3.14159265358979323846264338327950288419716939937510)
 (def π pi)
@@ -15,6 +17,10 @@
 
 (defn sq (n)
   (* n n))
+
+(defn close? (n m epsilon)
+  (< (abs (- n m))
+     (default epsilon 0.00000001)))
 
 (defn hypot (x0 y0 x1 y1)
   (do
@@ -44,12 +50,6 @@
         (if (>= n 0)
           (/ (int (+ (* n order) 0.5)) order)
           (neg (/ (int (+ (* (neg n) order) 0.5)) order)))))))
-
-(defn even? (n)
-  (zero? (% n 2)))
-
-(defn odd? (n)
-  (= (% n 2) 1))
 
 ; Euclid's GCD algorithm
 (defn gcd (a b)

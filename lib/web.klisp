@@ -1,0 +1,13 @@
+; web programming library
+;
+; includes a Klisp-to-JS/wasm (nanopass) compiler
+; includes support for JS interop, DOM, canvas
+
+(defn compile (expr)
+  'nanopass!'))
+
+(defmacro html (expr)
+  'html macros, like Hiccup'
+  'https://github.com/teropa/hiccups'
+  'https://github.com/weavejester/hiccup')
+

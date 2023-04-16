@@ -70,6 +70,17 @@
   (fn (x) (= (type x) ,symbol)))
 (def function?
   (fn (x) (= (type x) ,function)))
+(def atom?
+  (fn (x)
+    (| (nil? x)
+       (number? x)
+       (bool? x)
+       (string? x)
+       (symbol? x)
+       (function? x))))
+(def cons?
+  (fn (x)
+    (= (type x) ,list)))
 (def list?
   (fn (x)
     (| (= x nil)
@@ -92,10 +103,10 @@
   (fn (n) (> n 0)))
 (def neg?
   (fn (n) (< n 0)))
-(def not-neg?
-  (fn (n) (>= n 0)))
 (def not-pos?
   (fn (n) (<= n 0)))
+(def not-neg?
+  (fn (n) (>= n 0)))
 (def abs
   (fn (n)
     (if (neg? n)
@@ -109,7 +120,7 @@
 (def even?
   (fn (n) (zero? (% n 2))))
 (def odd?
-  (fn (n) (! (even? n))))
+  (fn (n) (zero? (% (+ n 1) 2))))
 (def inc
   (fn (n) (+ n 1)))
 (def dec
