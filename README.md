@@ -107,7 +107,7 @@ true
 Lastly, there are a handful of built-in functions that let Klisp programs interact with the local filesystem in a synchronous, blocking way. These are modeled after [Oak's `fs` standard library module functions](https://oaklang.org/lib/fs/).
 
 ```clj
-λ (-> (read-file 'README.md')
+λ (-> (fs/read 'README.md')
       (split '\n')
       (filter (partial starts-with? ? '- '))
       (map upper)
@@ -117,7 +117,7 @@ Lastly, there are a handful of built-in functions that let Klisp programs intera
 - FORMAT SOURCE FILES: `OAK FMT KLISP.OAK BUILD.OAK --FIX`
 - INSTALL TO `/USR/LOCAL/BIN/KLISP`: `OAK BUILD.OAK`
 - RUN TESTS: `KLISP TEST.KLISP`
-λ (-> (list-files 'lib')
+λ (-> (fs/ls 'lib')
       (map (partial getc ? ,name))
       (map (partial trim-end ? '.klisp'))
       sort)

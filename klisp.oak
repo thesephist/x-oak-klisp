@@ -584,8 +584,8 @@ Env := {
 	})
 
 	// I/O, system
-	'input': makeNative(fn(L) {
-		// TODO: implement
+	'input': makeNative(fn(_) {
+		input() |> entries() |> listify()
 	})
 	'print': makeNative(fn(L) {
 		output := L.1 |> reduceSexpr(
@@ -600,39 +600,29 @@ Env := {
 		)
 		oakPrint(output)
 	})
-	'read-file': makeNative(fn(L) if type(path := L.0) {
+	'fs/read': makeNative(fn(L) if type(path := L.0) {
 		:string -> fs.readFile(path)
 		_ -> ?
 	})
-	'write-file': makeNative(fn(L) if {
+	'fs/write': makeNative(fn(L) if {
 		type(path := L.0) = :string & type(file := L.(1).0) = :string ->
 			fs.writeFile(path, file)
 		_ -> ?
 	})
-	// TODO: consider renaming to e.g. "fs/read", "fs/stat", and these "fs/rm",
-	// "fs/mkdir" for consistency.
-	'rm': makeNative(fn(L) if {
-		// TODO: implement
+	'fs/append': makeNative(fn(L) if {
+		type(path := L.0) = :string & type(file := L.(1).0) = :string ->
+			fs.appendFile(path, file)
 		_ -> ?
 	})
-	'mkdir': makeNative(fn(L) if {
-		// TODO: implement
+	'fs/stat': makeNative(fn(L) if type(path := L.0) {
+		:string -> fs.statFile(path) |> entries() |> listify()
 		_ -> ?
 	})
-	// TODO: consider making open/close/read/write available for lower-level
-	// access, and making fs/read-file, etc. higher level library APIs.
-	'stat-file': makeNative(fn(L) if type(path := L.0) {
-		:string -> {
-			stat := fs.statFile(path)
-			name := [:name, stat.name]
-			len := [:len, stat.len]
-			mod := [:mod, stat.mod]
-			dir := [:dir, stat.dir]
-			[name, [len, [mod, [dir, ?]]]]
-		}
+	'fs/rm': makeNative(fn(L) if type(path := L.0) {
+		:string -> rm(path)
 		_ -> ?
 	})
-	'list-files': makeNative(fn(L) if type(path := L.0) {
+	'fs/ls': makeNative(fn(L) if type(path := L.0) {
 		:string -> {
 			fs.listFiles(path) |> map(fn(stat) {
 				name := [:name, stat.name]
@@ -642,6 +632,10 @@ Env := {
 				[name, [len, [mod, [dir, ?]]]]
 			}) |> listify()
 		}
+		_ -> ?
+	})
+	'fs/mkdir': makeNative(fn(L) if type(path := L.0) {
+		:string -> mkdir(path)
 		_ -> ?
 	})
 	'listen': makeNative(fn(L) {
