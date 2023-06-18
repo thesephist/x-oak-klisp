@@ -1,0 +1,28 @@
+; cryptographic primitives and cryptographically safe sources of randomness
+
+(defn uuid ()
+  (do
+    (def ns (-> (srand 16)
+                (split)
+                (map codepoint)))
+    (sets! ns 6 (-> (gets ns 6)
+                    (& 15)
+                    (| 64)))
+    (sets! ns 8 (-> (gets ns 8)
+                    (& 63)
+                    (| 128)))
+    (defn x (b)
+      (let (s (int->hex (nth ns b)))
+        (if (= (len s) 1)
+          (str 0 s)
+          s)))
+    (str (x 0) (x 1) (x 2) (x 3)
+         '-'
+         (x 4) (x 5)
+         '-'
+         (x 6) (x 7)
+         '-'
+         (x 8) (x 9)
+         '-'
+         (x 10) (x 11) (x 12) (x 13) (x 14) (x 15))))
+

@@ -1,0 +1,31 @@
+(def uuid-count 64)
+
+(defn uuid-char? (c)
+  (| (char-between? c 'a' 'f')
+     (digit? c)
+     (= c '-')))
+
+(defn uuid? (s)
+  (& (-> s
+         split
+         (every? uuid-char?))
+     (= (split s)
+        (list _ _ _ _ _ _ _ _ '-'
+              _ _ _ _ '-' _ _ _ _ '-' _ _ _ _ '-'
+              _ _ _ _ _ _ _ _ _ _ _ _))))
+
+(def tests
+  (deftestgroup 'crypto'
+    (deftest 'uuid format'
+      (-> (nat uuid-count)
+          (map uuid)
+          (every? uuid?))
+      true)
+    (deftest 'uuid uniqueness'
+      (-> (nat uuid-count)
+          (map uuid)
+          sort
+          uniq
+          size)
+      uuid-count)))
+
