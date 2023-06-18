@@ -4,12 +4,15 @@
 (import-from test/macro)
 (import-from test/iter)
 (import-from test/str)
+(import-from test/mut)
 (import-from test/math)
 (import-from test/sort)
-(import-from test/encoding)
 (import-from test/comp)
-(import-from test/mut)
 (import-from test/json)
+(import-from test/encoding)
+(import-from test/datetime)
+(import-from test/path)
+(import-from test/crypto)
 
 (run-tests
   test/klisp/langtests
@@ -17,10 +20,13 @@
   test/macro/tests
   test/iter/tests
   test/str/tests
+  test/mut/tests
   test/math/tests
   test/sort/tests
-  test/encoding/tests
   test/comp/tests
-  test/mut/tests
-  test/json/tests)
+  test/json/tests
+  test/encoding/tests
+  test/datetime/tests
+  test/path/tests
+  test/crypto/tests)
 
