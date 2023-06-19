@@ -23,16 +23,15 @@
       '▏'
       graph)))
 
-
-
 (defn debug/histo (xs bars cols)
   (if (zero? (size xs))
     ''
     (do
-      (default bars (size xs))
+      (default bars 10)
       (default cols 80)
       (def xmin (min xs))
       (def xmax (max xs))
+      (def bars (clamp bars 1 (size xs)))
       (def unit (/ (- xmax xmin) bars))
       (def buckets (-> (range bars)
                        (map (fn (i)
