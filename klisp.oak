@@ -281,10 +281,17 @@ fn getv(env, name, err?) if v := env.(name) {
 	_ -> v
 }
 
-fn setv(env, name, v) env.(name) := if type(v) {
-	:null -> LispNull
-	:empty -> LispEmpty
-	_ -> v
+fn setv(env, name, v) if type(name) {
+	:atom -> env.(name) := if type(v) {
+		:null -> LispNull
+		:empty -> LispEmpty
+		_ -> v
+	}
+	:list -> {
+		if v { ? -> v <- [] }
+		setv(env, name.0, v.0)
+		setv(env, name.1, v.1)
+	}
 }
 
 fn getEnvMeta(env, metaKey) if im := env.(metaKey) {
@@ -356,15 +363,7 @@ fn eval(L, env) if type(L) {
 				body
 				{
 					envc := { '\x00env': env }
-					fn setScope(param, arg) if type(param) {
-						:atom -> setv(envc, param, arg)
-						:list -> {
-							if arg { ? -> arg <- [] }
-							setScope(param.0, arg.0)
-							setScope(param.1, arg.1)
-						}
-					}
-					setScope(params, args)
+					setv(envc, params, args)
 					envc
 				}
 			), L)
@@ -380,15 +379,7 @@ fn eval(L, env) if type(L) {
 				body
 				{
 					envc := { '\x00env': env }
-					fn setScope(param, arg) if type(param) {
-						:atom -> setv(envc, param, arg)
-						:list -> {
-							if arg { ? -> arg <- [] }
-							setScope(param.0, arg.0)
-							setScope(param.1, arg.1)
-						}
-					}
-					setScope(params, args)
+					setv(envc, params, args)
 					envc
 				}
 			), L)
@@ -416,7 +407,7 @@ fn eval(L, env) if type(L) {
 			path.resolve(importPath + '.klisp', getEnvPath(env)) |>
 				getImportEnv(env) |>
 				entries() |>
-				each(fn(pair) if pair.0 != '\x00env' -> setv(env, prefix + '/' + pair.0, pair.1))
+				each(fn(pair) if pair.0 != '\x00env' -> setv(env, atom(prefix + '/' + pair.0), pair.1))
 		}
 		_ -> {
 			funcStub := eval(L.0, env)
