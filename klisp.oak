@@ -701,6 +701,7 @@ fn loadStdlib(withEnv) loadLibSources([
 	'{{ lib/datetime }}'
 	'{{ lib/path }}'
 	'{{ lib/test }}'
+	'{{ lib/debug }}'
 	'{{ lib/crypto }}'
 	'{{ lib/import }}'
 ], withEnv)

@@ -1,0 +1,54 @@
+; utilities for debugging and inspecting runtime values
+
+(defn debug/bar (n)
+  (let
+    (n (max (list (* 8 n) 0)))
+    (whole (int (/ n 8)))
+    (rem (% n 8))
+    (graph (str (-> (range whole)
+                    (map (constantly '█'))
+                    (join))
+                (match (round rem)
+                  (0 '')
+                  (1 '▏')
+                  (2 '▎')
+                  (3 '▍')
+                  (4 '▌')
+                  (5 '▋')
+                  (6 '▊')
+                  (7 '▉')
+                  (8 '█'))))
+    (if (& (empty? graph)
+           (pos? n))
+      '▏'
+      graph)))
+
+
+
+(defn debug/histo (xs bars cols)
+  (if (zero? (size xs))
+    ''
+    (do
+      (default bars (size xs))
+      (default cols 80)
+      (def xmin (min xs))
+      (def xmax (max xs))
+      (def unit (/ (- xmax xmin) bars))
+      (def buckets (-> (range bars)
+                       (map (fn (i)
+                              (let
+                                (lo (+ xmin (* unit i)))
+                                (hi (+ lo unit))
+                                (size (filter xs
+                                              (fn (x)
+                                                (& (>= x lo)
+                                                   (< x hi))))))))))
+      (def max-count (max buckets))
+      (-> buckets
+          (map (fn (n)
+                 (-> n
+                     (scale 0 max-count
+                            0 cols)
+                     debug/bar)))
+          (join '\n')))))
+
