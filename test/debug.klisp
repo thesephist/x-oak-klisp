@@ -1,0 +1,12 @@
+(def tests
+  (deftestgroup 'debug'
+    (deftest 'bar n = 0'
+      (debug/bar 0)
+      '')
+    (deftest 'bar n < 0'
+      (debug/bar -10)
+      '')
+    (deftest 'bar n = tiny fraction close to zero'
+      (debug/bar 0.0001)
+      '▏')))
+

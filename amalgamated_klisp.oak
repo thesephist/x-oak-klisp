@@ -281,10 +281,17 @@ fn getv(env, name, err?) if v := env.(name) {
 	_ -> v
 }
 
-fn setv(env, name, v) env.(name) := if type(v) {
-	:null -> LispNull
-	:empty -> LispEmpty
-	_ -> v
+fn setv(env, name, v) if type(name) {
+	:atom -> env.(name) := if type(v) {
+		:null -> LispNull
+		:empty -> LispEmpty
+		_ -> v
+	}
+	:list -> {
+		if v { ? -> v <- [] }
+		setv(env, name.0, v.0)
+		setv(env, name.1, v.1)
+	}
 }
 
 fn getEnvMeta(env, metaKey) if im := env.(metaKey) {
@@ -356,15 +363,7 @@ fn eval(L, env) if type(L) {
 				body
 				{
 					envc := { '\x00env': env }
-					fn setScope(param, arg) if type(param) {
-						:atom -> setv(envc, param, arg)
-						:list -> {
-							if arg { ? -> arg <- [] }
-							setScope(param.0, arg.0)
-							setScope(param.1, arg.1)
-						}
-					}
-					setScope(params, args)
+					setv(envc, params, args)
 					envc
 				}
 			), L)
@@ -380,15 +379,7 @@ fn eval(L, env) if type(L) {
 				body
 				{
 					envc := { '\x00env': env }
-					fn setScope(param, arg) if type(param) {
-						:atom -> setv(envc, param, arg)
-						:list -> {
-							if arg { ? -> arg <- [] }
-							setScope(param.0, arg.0)
-							setScope(param.1, arg.1)
-						}
-					}
-					setScope(params, args)
+					setv(envc, params, args)
 					envc
 				}
 			), L)
@@ -416,7 +407,7 @@ fn eval(L, env) if type(L) {
 			path.resolve(importPath + '.klisp', getEnvPath(env)) |>
 				getImportEnv(env) |>
 				entries() |>
-				each(fn(pair) if pair.0 != '\x00env' -> setv(env, prefix + '/' + pair.0, pair.1))
+				each(fn(pair) if pair.0 != '\x00env' -> setv(env, atom(prefix + '/' + pair.0), pair.1))
 		}
 		_ -> {
 			funcStub := eval(L.0, env)
@@ -850,6 +841,23 @@ fn loadStdlib(withEnv) loadLibSources([
 (def nat
   (fn (n) (range 1 (inc n))))
 
+; async
+
+(def interval
+  (fn (duration f)
+    (do
+      (defn call-and-schedule-next (f last-call)
+        (let
+          (_ (f last-call))
+          (time-to-next-call (- (+ last-call duration)
+                                (time)))
+          (if (pos? time-to-next-call)
+            (do
+              (wait time-to-next-call)
+              (call-and-schedule-next f (+ last-call duration)))
+            (call-and-schedule-next f (time)))))
+      (call-and-schedule-next f (time)))))
+
 '
 	'; core macros
 
@@ -954,10 +962,15 @@ fn loadStdlib(withEnv) loadLibSources([
 (def default
   (macro (name val)
     \'(default name value)\'
-    (quasiquote
-      (if (= (unquote name) nil)
-        (def (unquote name) (unquote val))
-        (unquote name)))))
+    (if (symbol? name)
+      (quasiquote
+        (if (= (unquote name) nil)
+          (def (unquote name) (unquote val))
+          (unquote name)))
+      (quasiquote
+        (if (= (unquote name) nil)
+          (unquote val)
+          (unquote name))))))
 
 (def loop
   (macro (n body)
@@ -1147,10 +1160,12 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (def println
   (macro terms
-    (cons ,do
-          (cons (cons ,print terms)
-                (cons ,(print \'\\n\')
-                      nil)))))
+    (if (nil? terms)
+      ,(print \'\\n\')
+      (cons ,do
+            (cons (cons ,print terms)
+                  (cons ,(print \'\\n\')
+                        nil))))))
 
 (def comment
   (macro terms
@@ -1697,9 +1712,25 @@ fn loadStdlib(withEnv) loadLibSources([
       (trim-end part)))
 
 '
-	'; math library
+	'; mut: mutable storage of data
 
-; TODO: flesh out from Oaklang\'s libmath functions
+(defmacro defmut (name val)
+  (quasiquote
+    (def (unquote name) (cons (unquote val) nil))))
+
+(defn getm (mut)
+  (car mut))
+
+(defn setm! (mut val)
+  (car! mut val))
+
+(defn incm! (mut val)
+  (do
+    (default val 1)
+    (car! mut (+ (car mut) val))))
+
+'
+	'; math library
 
 (def pi
   3.14159265358979323846264338327950288419716939937510)
@@ -1735,10 +1766,79 @@ fn loadStdlib(withEnv) loadLibSources([
       (+ c
          (* normed (- d c))))))
 
+(defn bearing (x y d t)
+  (list (+ x (* d (cos t)))
+        (+ y (* d (sin t)))))
+
+(defn orient (x0 y0 x1 y1)
+  (let ((x y) (if (& (nil? x1)
+                     (nil? y1))
+                (list x0 y0)
+                (list (- x1 x0)
+                      (- y1 y0))))
+    (cond ((pos? x)
+           (* 2 (atan (/ y (+ x (hypot x y))))))
+          ((& (<= x 0)
+              (!= y 0))
+           (* 2 (atan (/ (+ x (hypot x y)) y))))
+          ((& (neg? x)
+              (zero? y)))
+          π)))
+
+(def sum
+  (fn (ns) (reduce ns 0 +)))
+
+(def prod
+  (fn (ns) (reduce ns 1 *)))
+
+(def min
+  (fn (xs)
+    (if (nil? xs)
+      nil
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) a b))))))
+
+(def max
+  (fn (xs)
+    (if (nil? xs)
+      nil
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) b a))))))
+
 (defn clamp (x a b)
   (cond ((< x a) a)
         ((> x b) b)
         (x)))
+
+(defn mean (xs)
+  (/ (sum xs) (size xs)))
+
+(defn geomean (xs)
+  (# (prod xs) (/ 1 (size xs))))
+
+(defn median (xs)
+  (let
+    (xs (sort xs))
+    (count (size xs))
+    (half (int (/ count 2)))
+    (cond ((zero? count) nil)
+          ((zero? (% count 2) (/ (+ (nth xs (dec half))
+                                    (nth xs (half)))
+                                 2)))
+          ((nth xs half)))))
+
+(defn stddev (xs)
+  (let (xmean (mean xs))
+    (when (nil? xmean)
+      (-> xs
+          (map (fn (x)
+                 (sq (- xmean x))))
+          mean
+          sqrt))))
 
 (defn round (n decimals)
   (do
@@ -1813,36 +1913,6 @@ fn loadStdlib(withEnv) loadLibSources([
                         (/ n (car rev-first-half)))
                    (cdr (map rev-first-half (partial / n ?)))
                    (map rev-first-half (partial / n ?)))))))))
-
-(def sum
-  (fn (ns) (reduce ns 0 +)))
-
-(def prod
-  (fn (ns) (reduce ns 1 *)))
-
-(defn mean (xs)
-  (/ (sum xs) (size xs)))
-
-(defn geomean (xs)
-  (# (prod xs) (/ 1 (size xs))))
-
-(def min
-  (fn (xs)
-    (if (nil? xs)
-      nil
-      (reduce xs
-              (car xs)
-              (fn (a b)
-                (if (< a b) a b))))))
-
-(def max
-  (fn (xs)
-    (if (nil? xs)
-      nil
-      (reduce xs
-              (car xs)
-              (fn (a b)
-                (if (< a b) b a))))))
 
 '
 	'; sort library, implementing quicksort and mergesort
@@ -1930,6 +2000,109 @@ fn loadStdlib(withEnv) loadLibSources([
       (sort! pred)))
 
 '
+	'; composites: persistent immutable associative arrays
+
+(defmacro comp terms
+  \'comps store key-value pairs in a list as
+  ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
+  Each entry is a single cons cell rather than a list to make value lookup a
+  bit more efficient.\'
+  (do
+    (def -comp
+      (fn (items)
+        (if (nil? items)
+          nil
+          (list ,cons
+                (list ,cons (car items) (cadr items))
+                (-comp (cddr items))))))
+    (-comp terms)))
+
+(defn comp? (x)
+  (& (list? x)
+     (every? x list?)))
+
+(defn getc (cp k v)
+  \'recursive value lookup by key\'
+  (if (nil? cp)
+    v
+    (if (= k (caar cp))
+      (cdar cp)
+      (getc (cdr cp) k v))))
+
+(defn setc (cp k v)
+  \'comps are immutable, and new values are set by adding new entries to the
+  head of the comp\\\'s underlying list. setc does not modify the given comp
+  and returns a new comp with the new key, value set.\'
+  (cons (cons k v)
+        (exclude cp
+                 (partial = k (car ?)))))
+
+(defn keys (cp)
+  \'get just the comp keys\'
+  (map cp car))
+
+(defn values (cp)
+  \'get just the comp values\'
+  (map cp cdr))
+
+; functions with comps
+
+(defn freq (xs)
+  \'return a comp with frequency counts of each unique item in `xs`\'
+  (reduce xs
+          (comp)
+          (fn (counts x)
+            (setc counts
+                  x
+                  (inc (getc counts x 0))))))
+
+'
+	'; random library, implementing utilities for working
+; with pseudorandom sources of randomness
+
+(defn rand-bool ()
+  \'returns a random bool with equal chance\'
+  (< (rand) 0.5))
+
+(defn rand-int (min max)
+  \'returns a random integer in the range [min, max). If only a
+  single number is given as the argument, the range is assumed
+  to be [0, max) instead.\'
+  (int (rand-number (int min)
+                    (int max))))
+
+(defn rand-number (min max)
+  \'returns a random float in the range [min, max). If only a
+  single number is given as the argument, the range is assumed
+  to be [0, max) instead.\'
+  (do
+    (when (nil? max)
+      (do
+        (def max min)
+        (def min 0)))
+    (+ min
+       (* (rand) (- max min)))))
+
+(defn rand-choice (xs)
+  \'returns a randomly picked item from the list xs\'
+  (nth xs (rand-int 0 (size xs))))
+
+(defn rand-normal ()
+  (let
+    (u (- 1 (rand)))
+    (v (* 2 π (rand)))
+    (* (sqrt (* -2 (log e u)))
+       (cos v))))
+
+(defn rand-alphanumeric (n)
+  (-> (default n 1)
+      (list-of (rand-choice \'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789\'))
+      join))
+
+(defn uid ()
+  (rand-alphanumeric 16))
+
+'
 	'; json library support for encoding/decoding JSON
 
 (defn json/serialize (x)
@@ -1959,20 +2132,20 @@ fn loadStdlib(withEnv) loadLibSources([
       (,float (str x))
       (,bool (str x))
       (,list (if (comp? x)
-             (str \'{\'
-                  (-> x
-                      (map (fn (cell)
-                             (str \'"\'
+              (str \'{\'
+                     (-> x
+                         (map (fn (cell)
+                                (str \'"\'
                                   (escape (str (car cell)))
                                   \'":\'
-                                  (json/serialize (cdr cell)))))
-                      (join \',\'))
-                  \'}\')
-             (str \'[\'
-                  (-> x
-                      (map json/serialize)
-                      (join \',\'))
-                  \']\')))
+                                     (json/serialize (cdr cell)))))
+                         (join \',\'))
+                     \'}\')
+              (str \'[\'
+                     (-> x
+                         (map json/serialize)
+                         (join \',\'))
+                     \']\')))
       (\'null\'))))
 
 (defn json/parse (s)
@@ -2039,45 +2212,6 @@ fn loadStdlib(withEnv) loadLibSources([
         (-parse-reader))))
 
 '
-	'; random library, implementing utilities for working
-; with pseudorandom sources of randomness
-
-(defn rand-bool ()
-  \'returns a random bool with equal chance\'
-  (< (rand) 0.5))
-
-(defn rand-int (min max)
-  \'returns a random integer in the range [min, max). If only a
-  single number is given as the argument, the range is assumed
-  to be [0, max) instead.\'
-  (int (rand-number (int min)
-                    (int max))))
-
-(defn rand-number (min max)
-  \'returns a random float in the range [min, max). If only a
-  single number is given as the argument, the range is assumed
-  to be [0, max) instead.\'
-  (do
-    (when (nil? max)
-      (do
-        (def max min)
-        (def min 0)))
-    (+ min
-       (* (rand) (- max min)))))
-
-(defn rand-choice (xs)
-  \'returns a randomly picked item from the list xs\'
-  (nth xs (rand-int 0 (size xs))))
-
-(defn rand-alphanumeric (n)
-  (-> (default n 1)
-      (list-of (rand-choice \'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789\'))
-      join))
-
-(defn uid ()
-  (rand-alphanumeric 16))
-
-'
 	'; various data encodings: ascii
 
 (defn bytes (s)
@@ -2102,79 +2236,308 @@ fn loadStdlib(withEnv) loadLibSources([
       int))
 
 '
-	'; composites: persistent immutable associative arrays
+	'; utilities for working with dates and UNIX timestamps
 
-(defmacro comp terms
-  \'comps store key-value pairs in a list as
-  ((key . value) (key . value) (key . value)) for O(n) lookup and O(1) insert.
-  Each entry is a single cons cell rather than a list to make value lookup a
-  bit more efficient.\'
+(def leap-day (+ 31 28))
+(def seconds-per-day 86400)
+(def days-per-4-years (inc (* 4 365)))
+(def days-per-100-years (dec (* 25 days-per-4-years)))
+(def days-per-400-years (inc (* 4 days-per-100-years)))
+
+; our zero time is the year 1 CE, though the Gregorian calendar doesn\'t extend
+; that far into the past, to ensure that we can treat all dates in the Common
+; Era correctly without going into negative integer division, and we can take
+; advantage of 400-year cycles in the calendar.
+(def zero-year 1)
+(def days-from-1-to-1970 (- (* 5 days-per-400-years)
+                            (* 31 365)
+                            8)) ; 8 leap years
+
+(def days-before-month
+  (list
+    _
+    0
+    31
+    (+ 31 28)
+    (+ 31 28 31)
+    (+ 31 28 31 30)
+    (+ 31 28 31 30 31)
+    (+ 31 28 31 30 31 30)
+    (+ 31 28 31 30 31 30 31)
+    (+ 31 28 31 30 31 30 31 31)
+    (+ 31 28 31 30 31 30 31 31 30)
+    (+ 31 28 31 30 31 30 31 31 30 31)
+    (+ 31 28 31 30 31 30 31 31 30 31 30)
+    (+ 31 28 31 30 31 30 31 31 30 31 30 31)))
+
+(defn datetime/leap-year? (year)
+  (& (zero? (% year 4))
+     (| (!= (% year 100) 0)
+        (zero? (% year 400)))))
+
+(defn datetime/describe-date (t)
   (do
-    (def -comp
-      (fn (items)
-        (if (nil? items)
-          nil
-          (list ,cons
-                (list ,cons (car items) (cadr items))
-                (-comp (cddr items))))))
-    (-comp terms)))
+    (def d (+ days-from-1-to-1970
+              (// (- t (% t seconds-per-day))
+                  seconds-per-day)))
+    (when (& (neg? t)
+             (!= (% t seconds-per-day) 0))
+      (def d (dec d)))
 
-(defn comp? (x)
-  (& (list? x)
-     (every? x list?)))
+    (def n400 (// d days-per-400-years))
+    (def d (- d (* days-per-400-years n400)))
 
-(defn getc (cp k v)
-  \'recursive value lookup by key\'
-  (if (nil? cp)
-    v
-    (if (= k (caar cp))
-      (cdar cp)
-      (getc (cdr cp) k v))))
+    (def n100 (// d days-per-100-years))
+    (def n100 (- n100 (// n100 4)))
+    (def d (- d (* days-per-100-years n100)))
 
-(defn setc (cp k v)
-  \'comps are immutable, and new values are set by adding new entries to the
-  head of the comp\\\'s underlying list. setc does not modify the given comp
-  and returns a new comp with the new key, value set.\'
-  (cons (cons k v)
-        (exclude cp
-                 (partial = k (car ?)))))
+    (def n4 (// d days-per-4-years))
+    (def d (- d (* days-per-4-years n4)))
 
-(defn keys (cp)
-  \'get just the comp keys\'
-  (map cp car))
+    (def n (// d 365))
+    (def n (- n (// n 4)))
+    (def d (- d (* 365 n)))
 
-(defn values (cp)
-  \'get just the comp values\'
-  (map cp cdr))
+    (def year (+ zero-year
+                 (* 400 n400)
+                 (* 100 n100)
+                 (* 4 n4)
+                 n))
+    (def month 0)
+    (def day d)
 
-; functions with comps
+    (def leap-year? (datetime/leap-year? year))
+    (if (& leap-year?
+           (= day leap-day))
+      (def (month day) (list 2 29))
+      (do
+        (when (& leap-year?
+                 (> day leap-day))
+          (def day (dec day)))
+        (defn sub-month (m)
+          (if (< day (nth days-before-month (inc m)))
+            m
+            (sub-month (inc m))))
+        (def month (sub-month 1))
+        (def day (inc (- day (nth days-before-month month))))))
+    (list year
+          month
+          day)))
 
-(defn freq (xs)
-  \'return a comp with frequency counts of each unique item in `xs`\'
-  (reduce xs
-          (comp)
-          (fn (counts x)
-            (setc counts
-                  x
-                  (inc (getc counts x 0))))))
+(defn datetime/describe-clock (t)
+  (do
+    (def rem (% t seconds-per-day))
+    (when (neg? rem)
+      (def rem (+ rem seconds-per-day)))
+    (let
+      (hour (// rem 3600))
+      (rem (% rem 3600))
+      (minute (// rem 60))
+      (list hour
+            minute
+            (% rem 60)))))
+
+(defn datetime/describe (t)
+  (append (datetime/describe-date t)
+          (datetime/describe-clock t)))
+
+(defn datetime/timestamp (desc)
+  (let
+    ((year month day hour minute second) desc)
+    (leap-year? (datetime/leap-year? year))
+
+    (year (- year zero-year))
+    (n400 (// year 400))
+    (year (% year 400))
+    (n100 (// year 100))
+    (year (% year 100))
+    (n4 (// year 4))
+    (year (% year 4))
+
+    (days-year-to-date (if leap-year?
+                         (cond
+                           ((| (= month 1)
+                               (& (= month 2)
+                                  (< day 29)))
+                            (dec (+ (nth days-before-month month) day)))
+                           ((& (= month 2)
+                               (= day 29))
+                            59)
+                           ((+ (nth days-before-month month) day)))
+                         (dec (+ (nth days-before-month month) day))))
+    (days-from-1 (+ (* days-per-400-years n400)
+                    (* days-per-100-years n100)
+                    (* days-per-4-years n4)
+                    (* 365 year)
+                    days-year-to-date))
+    (days-from-1970 (- days-from-1
+                       days-from-1-to-1970))
+    (+ (* days-from-1970 seconds-per-day)
+       (* 3600 hour)
+       (* 60 minute)
+       second)))
+
+(defn datetime/format (t tz-offset)
+  (do
+    (default tz-offset 0)
+    (def (year month day hour minute second)
+      (datetime/describe (+ t (* 60 tz-offset))))
+    (str (cond
+           ((> year 9999) (-> year str (pad-start 6 \'0\')))
+           ((neg? year) (str \'-\' (-> (neg year) str (pad-start 6 \'0\'))))
+           ((-> year str (pad-start 4 \'0\'))))
+         \'-\'
+         (-> month str (pad-start 2 \'0\'))
+         \'-\'
+         (-> day str (pad-start 2 \'0\'))
+         \'T\'
+         (-> hour str (pad-start 2 \'0\'))
+         \':\'
+         (-> minute str (pad-start 2 \'0\'))
+         \':\'
+         (-> second int str (pad-start 2 \'0\'))
+         (let (millis (round (% (* second 1000) 1000)))
+           (if (zero? millis)
+             \'\'
+             (str \'.\' millis)))
+         (cond
+           ((zero? tz-offset) \'Z\')
+           ((neg? tz-offset) (str (-> (// tz-offset 60) str (pad-start 2 \'0\'))
+                                  \':\'
+                                  (-> (% tz-offset 60) str (pad-start 2 \'0\'))))
+           ((str \'-\'
+                 (-> (// (neg tz-offset) 60) str (pad-start 2 \'0\'))
+                 \':\'
+                 (-> (% (neg tz-offset) 60) str (pad-start 2 \'0\'))))))))
+
+(defn datetime/parse-tz-offset (offset-str)
+  (let ((hh mm) (-> offset-str
+                    (split \':\')
+                    (map int)))
+    (unless (| (nil? hh)
+               (nil? mm))
+      (+ (* 60 hh) mm))))
+
+(defn datetime/parse (s)
+  (let ((date clock) (split s \'T\'))
+    (unless (| (nil? date)
+               (nil? clock))
+      (let
+        ((year month day) (-> date
+                              (split \'-\')
+                              (map int)))
+        ((hour minute second) (-> clock
+                                  (take 8)
+                                  (split \':\')
+                                  (map int)))
+        (unless (| (nil? year)
+                   (nil? month)
+                   (nil? day)
+                   (nil? hour)
+                   (nil? minute)
+                   (nil? second))
+          (let
+            ((_ millis) (-> clock
+                            (split \'.\')
+                            (map (fn (s)
+                                   (-> s (take 3) int)))))
+            (tz-offset (cond
+                         ((contains? clock \'+\')
+                          (datetime/parse-tz-offset (slice clock
+                                                           (inc (index clock \'+\')))))
+                         ((contains? clock \'-\')
+                          (let (parsed (datetime/parse-tz-offset (slice clock
+                                                                        (inc (index clock \'-\')))))
+                            (if (nil? parsed)
+                              nil
+                              (neg parsed))))
+                         (0)))
+            (unless (nil? tz-offset)
+              (list year
+                    month
+                    day
+                    hour
+                    minute
+                    (+ second (/ (default millis 0) 1000))
+                    tz-offset))))))))
+
+
 
 '
-	'; mut: mutable storage of data
+	'; working with UNIX style paths on file systems and in URIs
 
-(defmacro defmut (name val)
-  (quasiquote
-    (def (unquote name) (cons (unquote val) nil))))
+(defn path/abs? (path)
+  (= (char-at path 0) \'/\'))
 
-(defn getm (mut)
-  (car mut))
+(defn path/rel? (path)
+  (!= (char-at path 0) \'/\'))
 
-(defn setm! (mut val)
-  (car! mut val))
+(defn path/last-slash (path)
+  (if (empty? path)
+    0
+    (do
+      (defn -last-slash (i)
+        (if (| ((nil? (nth path i)))
+               (= \'/\' (nth path i)))
+          i
+          (-last-slash (dec i))))
+      (-last-slash (dec (len path))))))
 
-(defn incm! (mut val)
-  (do
-    (default val 1)
-    (car! mut (+ (car mut) val))))
+(defn path/dir (path)
+  (let (path (trim-end path \'/\'))
+    (-> path
+        (slice 0 (path/last-slash path)))))
+
+(defn path/base (path)
+  (let (path (trim-end path \'/\'))
+    (-> path
+        (slice (inc (path/last-slash path))))))
+
+(defn path/cut (path)
+  (let
+    (path (trim-end path \'/\'))
+    (last-slash (path/last-slash path))
+    (list (slice path 0 last-slash)
+          (slice path (inc last-slash)))))
+
+(defn path/clean (path)
+  (let (cleaned (-> path
+                    (split \'/\')
+                    (reduce nil
+                            (fn (parts part i)
+                              (match part
+                                (\'\' parts)
+                                (\'.\' parts)
+                                (\'..\' (if (zero? i)
+                                        (<< parts part)
+                                        (slice parts 0 (dec (size parts)))))
+                                ((<< parts part)))))
+                    (join \'/\')))
+    (if (path/abs? path)
+      (str \'/\' cleaned)
+      cleaned)))
+
+(defn path/join parts
+  (-> parts
+      (reduce \'\'
+              (fn (base path)
+                (if (empty? base)
+                  path
+                  (str base \'/\' path))))
+      path/clean))
+
+(defn path/split (path)
+  (if (empty? (trim-end path \'/\'))
+    nil
+    (-> path
+        (split \'/\')
+        (exclude empty?))))
+
+(defn path/resolve (path base)
+  (if (path/abs? path)
+    (path/clean path)
+    (path/join (default base (getc (env) \'PWD\'))
+               path)))
 
 '
 	'; utilities for writing and running test suites
@@ -2191,37 +2554,44 @@ fn loadStdlib(withEnv) loadLibSources([
   (let
     (tests (test/flatten-tree test-tree))
     (tests-count (size tests))
-    (clear-line! (fn ()
-                   (print \'\\x1b[2K\\x1b[0G\')))
+    (clear-line (fn ()
+                  \'\\x1b\\[2K\\x1b\\[0G\'))
     (name-test (fn (t)
                  (-> (nth t 1)
                      (join \' → \'))))
+    (progress-bar (fn (i max-chars)
+                    (let (bar (debug/bar (scale i
+                                                0 tests-count
+                                                0 max-chars)))
+                      ; bar chars are 3 bytes per codepoint
+                      (bar-len (-> bar len (/ 3) int))
+                      (str bar
+                           (extend \' \' (- max-chars bar-len))))))
     (passes (-> tests
-                (enumerate)
+                enumerate
                 (filter (fn ((i t))
                           (let
                             (name (name-test t))
-                            (do
-                              ; pre-compute log-line so there is no delay
-                              ; between clear-line! and logging the test name
-                              (def log-line (str \'(\' (inc i) \'/\' tests-count \')\'
-                                                 \' \'
-                                                 name))
-                              (clear-line!)
-                              (print log-line)
-                              (def result ((nth t 2)))
-                              (def expected ((nth t 3)))
-                              (if (= result expected)
-                                true
-                                (do
-                                  (clear-line!)
-                                  (println (str name
-                                                \': expected \' expected
-                                                \', got \' result))
-                                  false))))))))
+                            (n (inc i))
+                            (_ (print
+                                 (str (clear-line)
+                                      \'[\' (progress-bar n 8) \'] (\' n \'/\' tests-count \') \' name)))
+                            (result ((nth t 2)))
+                            (expected ((nth t 3)))
+                            (if (= result expected)
+                              true
+                              (do
+                                (println
+                                  (str (clear-line)
+                                       name
+                                       \': expected \' expected
+                                       \', got \' result))
+                                false)))))))
     (do
-      (clear-line!)
-      (println (str (size passes) \'/\' tests-count
+      (println (str (clear-line)
+                    (if (= (size passes) tests-count)
+                      \'all\'
+                      (str (size passes) \'/\' tests-count))
                     \' tests passed.\'))
       (when (!= tests-count (size passes))
         (exit 1)))))
@@ -2256,6 +2626,90 @@ fn loadStdlib(withEnv) loadLibSources([
                     (fn () (unquote expected)))))
 
 '
+	'; utilities for debugging and inspecting runtime values
+
+(defn debug/bar (n)
+  (let
+    (n (max (list (* 8 n) 0)))
+    (whole (int (/ n 8)))
+    (rem (% n 8))
+    (graph (str (-> (range whole)
+                    (map (constantly \'█\'))
+                    (join))
+                (match (round rem)
+                  (0 \'\')
+                  (1 \'▏\')
+                  (2 \'▎\')
+                  (3 \'▍\')
+                  (4 \'▌\')
+                  (5 \'▋\')
+                  (6 \'▊\')
+                  (7 \'▉\')
+                  (8 \'█\'))))
+    (if (& (empty? graph)
+           (pos? n))
+      \'▏\'
+      graph)))
+
+
+
+(defn debug/histo (xs bars cols)
+  (if (zero? (size xs))
+    \'\'
+    (do
+      (default bars (size xs))
+      (default cols 80)
+      (def xmin (min xs))
+      (def xmax (max xs))
+      (def unit (/ (- xmax xmin) bars))
+      (def buckets (-> (range bars)
+                       (map (fn (i)
+                              (let
+                                (lo (+ xmin (* unit i)))
+                                (hi (+ lo unit))
+                                (size (filter xs
+                                              (fn (x)
+                                                (& (>= x lo)
+                                                   (< x hi))))))))))
+      (def max-count (max buckets))
+      (-> buckets
+          (map (fn (n)
+                 (-> n
+                     (scale 0 max-count
+                            0 cols)
+                     debug/bar)))
+          (join \'\\n\')))))
+
+'
+	'; cryptographic primitives and cryptographically safe sources of randomness
+
+(defn uuid ()
+  (do
+    (def ns (-> (srand 16)
+                (split)
+                (map codepoint)))
+    (sets! ns 6 (-> (gets ns 6)
+                    (& 15)
+                    (| 64)))
+    (sets! ns 8 (-> (gets ns 8)
+                    (& 63)
+                    (| 128)))
+    (defn x (b)
+      (let (s (int->hex (nth ns b)))
+        (if (= (len s) 1)
+          (str 0 s)
+          s)))
+    (str (x 0) (x 1) (x 2) (x 3)
+         \'-\'
+         (x 4) (x 5)
+         \'-\'
+         (x 6) (x 7)
+         \'-\'
+         (x 8) (x 9)
+         \'-\'
+         (x 10) (x 11) (x 12) (x 13) (x 14) (x 15))))
+
+'
 	'; import macros
 
 (defmacro import-from (symbol-path symbols)
@@ -2269,8 +2723,9 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defmacro import-as (symbol-path alias)
   (quasiquote
-    (import (unquote (str symbol-path))
-            (unquote (str alias)))))
+    (import
+      (unquote (str symbol-path))
+      (unquote (str alias)))))
 
 '
 ], withEnv)

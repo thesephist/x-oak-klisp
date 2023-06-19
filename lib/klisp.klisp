@@ -152,3 +152,20 @@
 (def nat
   (fn (n) (range 1 (inc n))))
 
+; async
+
+(def interval
+  (fn (duration f)
+    (do
+      (defn call-and-schedule-next (f last-call)
+        (let
+          (_ (f last-call))
+          (time-to-next-call (- (+ last-call duration)
+                                (time)))
+          (if (pos? time-to-next-call)
+            (do
+              (wait time-to-next-call)
+              (call-and-schedule-next f (+ last-call duration)))
+            (call-and-schedule-next f (time)))))
+      (call-and-schedule-next f (time)))))
+

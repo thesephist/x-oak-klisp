@@ -101,10 +101,15 @@
 (def default
   (macro (name val)
     '(default name value)'
-    (quasiquote
-      (if (= (unquote name) nil)
-        (def (unquote name) (unquote val))
-        (unquote name)))))
+    (if (symbol? name)
+      (quasiquote
+        (if (= (unquote name) nil)
+          (def (unquote name) (unquote val))
+          (unquote name)))
+      (quasiquote
+        (if (= (unquote name) nil)
+          (unquote val)
+          (unquote name))))))
 
 (def loop
   (macro (n body)
@@ -294,10 +299,12 @@
 
 (def println
   (macro terms
-    (cons ,do
-          (cons (cons ,print terms)
-                (cons ,(print '\n')
-                      nil)))))
+    (if (nil? terms)
+      ,(print '\n')
+      (cons ,do
+            (cons (cons ,print terms)
+                  (cons ,(print '\n')
+                        nil))))))
 
 (def comment
   (macro terms

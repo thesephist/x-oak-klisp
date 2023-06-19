@@ -27,20 +27,20 @@
       (,float (str x))
       (,bool (str x))
       (,list (if (comp? x)
-             (str '{'
-                  (-> x
-                      (map (fn (cell)
-                             (str '"'
-                                  (escape (str (car cell)))
-                                  '":'
-                                  (json/serialize (cdr cell)))))
-                      (join ','))
-                  '}')
-             (str '['
-                  (-> x
-                      (map json/serialize)
-                      (join ','))
-                  ']')))
+               (str '{'
+                    (-> x
+                        (map (fn (cell)
+                               (str '"'
+                                    (escape (str (car cell)))
+                                    '":'
+                                    (json/serialize (cdr cell)))))
+                        (join ','))
+                    '}')
+               (str '['
+                    (-> x
+                        (map json/serialize)
+                        (join ','))
+                    ']')))
       ('null'))))
 
 (defn json/parse (s)

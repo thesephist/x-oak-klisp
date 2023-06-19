@@ -1,0 +1,75 @@
+; working with UNIX style paths on file systems and in URIs
+
+(defn path/abs? (path)
+  (= (char-at path 0) '/'))
+
+(defn path/rel? (path)
+  (!= (char-at path 0) '/'))
+
+(defn path/last-slash (path)
+  (if (empty? path)
+    0
+    (do
+      (defn -last-slash (i)
+        (if (| ((nil? (nth path i)))
+               (= '/' (nth path i)))
+          i
+          (-last-slash (dec i))))
+      (-last-slash (dec (len path))))))
+
+(defn path/dir (path)
+  (let (path (trim-end path '/'))
+    (-> path
+        (slice 0 (path/last-slash path)))))
+
+(defn path/base (path)
+  (let (path (trim-end path '/'))
+    (-> path
+        (slice (inc (path/last-slash path))))))
+
+(defn path/cut (path)
+  (let
+    (path (trim-end path '/'))
+    (last-slash (path/last-slash path))
+    (list (slice path 0 last-slash)
+          (slice path (inc last-slash)))))
+
+(defn path/clean (path)
+  (let (cleaned (-> path
+                    (split '/')
+                    (reduce nil
+                            (fn (parts part i)
+                              (match part
+                                ('' parts)
+                                ('.' parts)
+                                ('..' (if (zero? i)
+                                        (<< parts part)
+                                        (slice parts 0 (dec (size parts)))))
+                                ((<< parts part)))))
+                    (join '/')))
+    (if (path/abs? path)
+      (str '/' cleaned)
+      cleaned)))
+
+(defn path/join parts
+  (-> parts
+      (reduce ''
+              (fn (base path)
+                (if (empty? base)
+                  path
+                  (str base '/' path))))
+      path/clean))
+
+(defn path/split (path)
+  (if (empty? (trim-end path '/'))
+    nil
+    (-> path
+        (split '/')
+        (exclude empty?))))
+
+(defn path/resolve (path base)
+  (if (path/abs? path)
+    (path/clean path)
+    (path/join (default base (getc (env) 'PWD'))
+               path)))
+

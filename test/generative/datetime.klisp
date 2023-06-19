@@ -1,0 +1,50 @@
+; generative tests for libdatetime self-consistency
+
+(def times 1000)
+(def min-ts -30610224000)
+(def max-ts 16725225600)
+(def random-timestamps
+  (-> (range times)
+      (map (partial rand-int min-ts max-ts))))
+
+(defn clear-line ()
+  '\x1b\[2K\x1b\[0G')
+(defn error-report (i ts)
+  (str 'fail #' i ': ' ts ' <-> ' (datetime/format ts) '\n'))
+(defn progress-bar (i max-chars)
+  (let
+    (bar (debug/bar (scale i
+                           0 times
+                           0 max-chars)))
+    ; bar chars are 3 bytes per codepoint
+    (bar-len (-> bar len (/ 3) int))
+    (extended-bar (str bar
+                       (extend ' ' (- max-chars bar-len))))
+    (str '[' extended-bar '] (' i '/' times ')')))
+(defn ts-cycles? (ts)
+  (let (derived-ts (-> ts
+                       datetime/format
+                       datetime/parse
+                       datetime/timestamp))
+    (= ts derived-ts)))
+
+(println (str 'Generative libdatetime tests from '
+              (datetime/format min-ts)
+              ' to '
+              (datetime/format max-ts)
+              ':'))
+(-> random-timestamps
+    enumerate
+    (each (fn ((i ts))
+            (let
+              (n (inc i))
+              (ok? (ts-cycles? ts))
+              (print (str (clear-line)
+                          (if ok?
+                            ''
+                            (error-report i ts))
+                          (progress-bar n 8)))))))
+(print (str (clear-line)
+            'done.'))
+(println)
+

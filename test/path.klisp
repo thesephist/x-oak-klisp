@@ -1,0 +1,2 @@
+(def tests
+  (deftestgroup 'path'))

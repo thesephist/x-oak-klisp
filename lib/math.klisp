@@ -1,7 +1,5 @@
 ; math library
 
-; TODO: flesh out from Oaklang's libmath functions
-
 (def pi
   3.14159265358979323846264338327950288419716939937510)
 (def π pi)
@@ -36,10 +34,79 @@
       (+ c
          (* normed (- d c))))))
 
+(defn bearing (x y d t)
+  (list (+ x (* d (cos t)))
+        (+ y (* d (sin t)))))
+
+(defn orient (x0 y0 x1 y1)
+  (let ((x y) (if (& (nil? x1)
+                     (nil? y1))
+                (list x0 y0)
+                (list (- x1 x0)
+                      (- y1 y0))))
+    (cond ((pos? x)
+           (* 2 (atan (/ y (+ x (hypot x y))))))
+          ((& (<= x 0)
+              (!= y 0))
+           (* 2 (atan (/ (+ x (hypot x y)) y))))
+          ((& (neg? x)
+              (zero? y)))
+          π)))
+
+(def sum
+  (fn (ns) (reduce ns 0 +)))
+
+(def prod
+  (fn (ns) (reduce ns 1 *)))
+
+(def min
+  (fn (xs)
+    (if (nil? xs)
+      nil
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) a b))))))
+
+(def max
+  (fn (xs)
+    (if (nil? xs)
+      nil
+      (reduce xs
+              (car xs)
+              (fn (a b)
+                (if (< a b) b a))))))
+
 (defn clamp (x a b)
   (cond ((< x a) a)
         ((> x b) b)
         (x)))
+
+(defn mean (xs)
+  (/ (sum xs) (size xs)))
+
+(defn geomean (xs)
+  (# (prod xs) (/ 1 (size xs))))
+
+(defn median (xs)
+  (let
+    (xs (sort xs))
+    (count (size xs))
+    (half (int (/ count 2)))
+    (cond ((zero? count) nil)
+          ((zero? (% count 2) (/ (+ (nth xs (dec half))
+                                    (nth xs (half)))
+                                 2)))
+          ((nth xs half)))))
+
+(defn stddev (xs)
+  (let (xmean (mean xs))
+    (when (nil? xmean)
+      (-> xs
+          (map (fn (x)
+                 (sq (- xmean x))))
+          mean
+          sqrt))))
 
 (defn round (n decimals)
   (do
@@ -114,34 +181,4 @@
                         (/ n (car rev-first-half)))
                    (cdr (map rev-first-half (partial / n ?)))
                    (map rev-first-half (partial / n ?)))))))))
-
-(def sum
-  (fn (ns) (reduce ns 0 +)))
-
-(def prod
-  (fn (ns) (reduce ns 1 *)))
-
-(defn mean (xs)
-  (/ (sum xs) (size xs)))
-
-(defn geomean (xs)
-  (# (prod xs) (/ 1 (size xs))))
-
-(def min
-  (fn (xs)
-    (if (nil? xs)
-      nil
-      (reduce xs
-              (car xs)
-              (fn (a b)
-                (if (< a b) a b))))))
-
-(def max
-  (fn (xs)
-    (if (nil? xs)
-      nil
-      (reduce xs
-              (car xs)
-              (fn (a b)
-                (if (< a b) b a))))))
 

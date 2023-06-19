@@ -1,0 +1,227 @@
+; utilities for working with dates and UNIX timestamps
+
+(def leap-day (+ 31 28))
+(def seconds-per-day 86400)
+(def days-per-4-years (inc (* 4 365)))
+(def days-per-100-years (dec (* 25 days-per-4-years)))
+(def days-per-400-years (inc (* 4 days-per-100-years)))
+
+; our zero time is the year 1 CE, though the Gregorian calendar doesn't extend
+; that far into the past, to ensure that we can treat all dates in the Common
+; Era correctly without going into negative integer division, and we can take
+; advantage of 400-year cycles in the calendar.
+(def zero-year 1)
+(def days-from-1-to-1970 (- (* 5 days-per-400-years)
+                            (* 31 365)
+                            8)) ; 8 leap years
+
+(def days-before-month
+  (list
+    _
+    0
+    31
+    (+ 31 28)
+    (+ 31 28 31)
+    (+ 31 28 31 30)
+    (+ 31 28 31 30 31)
+    (+ 31 28 31 30 31 30)
+    (+ 31 28 31 30 31 30 31)
+    (+ 31 28 31 30 31 30 31 31)
+    (+ 31 28 31 30 31 30 31 31 30)
+    (+ 31 28 31 30 31 30 31 31 30 31)
+    (+ 31 28 31 30 31 30 31 31 30 31 30)
+    (+ 31 28 31 30 31 30 31 31 30 31 30 31)))
+
+(defn datetime/leap-year? (year)
+  (& (zero? (% year 4))
+     (| (!= (% year 100) 0)
+        (zero? (% year 400)))))
+
+(defn datetime/describe-date (t)
+  (do
+    (def d (+ days-from-1-to-1970
+              (// (- t (% t seconds-per-day))
+                  seconds-per-day)))
+    (when (& (neg? t)
+             (!= (% t seconds-per-day) 0))
+      (def d (dec d)))
+
+    (def n400 (// d days-per-400-years))
+    (def d (- d (* days-per-400-years n400)))
+
+    (def n100 (// d days-per-100-years))
+    (def n100 (- n100 (// n100 4)))
+    (def d (- d (* days-per-100-years n100)))
+
+    (def n4 (// d days-per-4-years))
+    (def d (- d (* days-per-4-years n4)))
+
+    (def n (// d 365))
+    (def n (- n (// n 4)))
+    (def d (- d (* 365 n)))
+
+    (def year (+ zero-year
+                 (* 400 n400)
+                 (* 100 n100)
+                 (* 4 n4)
+                 n))
+    (def month 0)
+    (def day d)
+
+    (def leap-year? (datetime/leap-year? year))
+    (if (& leap-year?
+           (= day leap-day))
+      (def (month day) (list 2 29))
+      (do
+        (when (& leap-year?
+                 (> day leap-day))
+          (def day (dec day)))
+        (defn sub-month (m)
+          (if (< day (nth days-before-month (inc m)))
+            m
+            (sub-month (inc m))))
+        (def month (sub-month 1))
+        (def day (inc (- day (nth days-before-month month))))))
+    (list year
+          month
+          day)))
+
+(defn datetime/describe-clock (t)
+  (do
+    (def rem (% t seconds-per-day))
+    (when (neg? rem)
+      (def rem (+ rem seconds-per-day)))
+    (let
+      (hour (// rem 3600))
+      (rem (% rem 3600))
+      (minute (// rem 60))
+      (list hour
+            minute
+            (% rem 60)))))
+
+(defn datetime/describe (t)
+  (append (datetime/describe-date t)
+          (datetime/describe-clock t)))
+
+(defn datetime/timestamp (desc)
+  (let
+    ((year month day hour minute second) desc)
+    (leap-year? (datetime/leap-year? year))
+
+    (year (- year zero-year))
+    (n400 (// year 400))
+    (year (% year 400))
+    (n100 (// year 100))
+    (year (% year 100))
+    (n4 (// year 4))
+    (year (% year 4))
+
+    (days-year-to-date (if leap-year?
+                         (cond
+                           ((| (= month 1)
+                               (& (= month 2)
+                                  (< day 29)))
+                            (dec (+ (nth days-before-month month) day)))
+                           ((& (= month 2)
+                               (= day 29))
+                            59)
+                           ((+ (nth days-before-month month) day)))
+                         (dec (+ (nth days-before-month month) day))))
+    (days-from-1 (+ (* days-per-400-years n400)
+                    (* days-per-100-years n100)
+                    (* days-per-4-years n4)
+                    (* 365 year)
+                    days-year-to-date))
+    (days-from-1970 (- days-from-1
+                       days-from-1-to-1970))
+    (+ (* days-from-1970 seconds-per-day)
+       (* 3600 hour)
+       (* 60 minute)
+       second)))
+
+(defn datetime/format (t tz-offset)
+  (do
+    (default tz-offset 0)
+    (def (year month day hour minute second)
+      (datetime/describe (+ t (* 60 tz-offset))))
+    (str (cond
+           ((> year 9999) (-> year str (pad-start 6 '0')))
+           ((neg? year) (str '-' (-> (neg year) str (pad-start 6 '0'))))
+           ((-> year str (pad-start 4 '0'))))
+         '-'
+         (-> month str (pad-start 2 '0'))
+         '-'
+         (-> day str (pad-start 2 '0'))
+         'T'
+         (-> hour str (pad-start 2 '0'))
+         ':'
+         (-> minute str (pad-start 2 '0'))
+         ':'
+         (-> second int str (pad-start 2 '0'))
+         (let (millis (round (% (* second 1000) 1000)))
+           (if (zero? millis)
+             ''
+             (str '.' millis)))
+         (cond
+           ((zero? tz-offset) 'Z')
+           ((neg? tz-offset) (str (-> (// tz-offset 60) str (pad-start 2 '0'))
+                                  ':'
+                                  (-> (% tz-offset 60) str (pad-start 2 '0'))))
+           ((str '-'
+                 (-> (// (neg tz-offset) 60) str (pad-start 2 '0'))
+                 ':'
+                 (-> (% (neg tz-offset) 60) str (pad-start 2 '0'))))))))
+
+(defn datetime/parse-tz-offset (offset-str)
+  (let ((hh mm) (-> offset-str
+                    (split ':')
+                    (map int)))
+    (unless (| (nil? hh)
+               (nil? mm))
+      (+ (* 60 hh) mm))))
+
+(defn datetime/parse (s)
+  (let ((date clock) (split s 'T'))
+    (unless (| (nil? date)
+               (nil? clock))
+      (let
+        ((year month day) (-> date
+                              (split '-')
+                              (map int)))
+        ((hour minute second) (-> clock
+                                  (take 8)
+                                  (split ':')
+                                  (map int)))
+        (unless (| (nil? year)
+                   (nil? month)
+                   (nil? day)
+                   (nil? hour)
+                   (nil? minute)
+                   (nil? second))
+          (let
+            ((_ millis) (-> clock
+                            (split '.')
+                            (map (fn (s)
+                                   (-> s (take 3) int)))))
+            (tz-offset (cond
+                         ((contains? clock '+')
+                          (datetime/parse-tz-offset (slice clock
+                                                           (inc (index clock '+')))))
+                         ((contains? clock '-')
+                          (let (parsed (datetime/parse-tz-offset (slice clock
+                                                                        (inc (index clock '-')))))
+                            (if (nil? parsed)
+                              nil
+                              (neg parsed))))
+                         (0)))
+            (unless (nil? tz-offset)
+              (list year
+                    month
+                    day
+                    hour
+                    minute
+                    (+ second (/ (default millis 0) 1000))
+                    tz-offset))))))))
+
+
+

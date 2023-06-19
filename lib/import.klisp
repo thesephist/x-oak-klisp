@@ -11,6 +11,7 @@
 
 (defmacro import-as (symbol-path alias)
   (quasiquote
-    (import (unquote (str symbol-path))
-            (unquote (str alias)))))
+    (import
+      (unquote (str symbol-path))
+      (unquote (str alias)))))
 
