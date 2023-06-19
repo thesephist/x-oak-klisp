@@ -12,37 +12,44 @@
   (let
     (tests (test/flatten-tree test-tree))
     (tests-count (size tests))
-    (clear-line! (fn ()
-                   (print '\x1b[2K\x1b[0G')))
+    (clear-line (fn ()
+                  '\x1b\[2K\x1b\[0G'))
     (name-test (fn (t)
                  (-> (nth t 1)
                      (join ' → '))))
+    (progress-bar (fn (i max-chars)
+                    (let (bar (debug/bar (scale i
+                                                0 tests-count
+                                                0 max-chars)))
+                      ; bar chars are 3 bytes per codepoint
+                      (bar-len (-> bar len (/ 3) int))
+                      (str bar
+                           (extend ' ' (- max-chars bar-len))))))
     (passes (-> tests
-                (enumerate)
+                enumerate
                 (filter (fn ((i t))
                           (let
                             (name (name-test t))
-                            (do
-                              ; pre-compute log-line so there is no delay
-                              ; between clear-line! and logging the test name
-                              (def log-line (str '(' (inc i) '/' tests-count ')'
-                                                 ' '
-                                                 name))
-                              (clear-line!)
-                              (print log-line)
-                              (def result ((nth t 2)))
-                              (def expected ((nth t 3)))
-                              (if (= result expected)
-                                true
-                                (do
-                                  (clear-line!)
-                                  (println (str name
-                                                ': expected ' expected
-                                                ', got ' result))
-                                  false))))))))
+                            (n (inc i))
+                            (_ (print
+                                 (str (clear-line)
+                                      '[' (progress-bar n 8) '] (' n '/' tests-count ') ' name)))
+                            (result ((nth t 2)))
+                            (expected ((nth t 3)))
+                            (if (= result expected)
+                              true
+                              (do
+                                (println
+                                  (str (clear-line)
+                                       name
+                                       ': expected ' expected
+                                       ', got ' result))
+                                false)))))))
     (do
-      (clear-line!)
-      (println (str (size passes) '/' tests-count
+      (println (str (clear-line)
+                    (if (= (size passes) tests-count)
+                      'all'
+                      (str (size passes) '/' tests-count))
                     ' tests passed.'))
       (when (!= tests-count (size passes))
         (exit 1)))))

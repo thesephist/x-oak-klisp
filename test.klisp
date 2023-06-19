@@ -12,6 +12,7 @@
 (import-from test/encoding)
 (import-from test/datetime)
 (import-from test/path)
+(import-from test/debug)
 (import-from test/crypto)
 
 (run-tests
@@ -28,5 +29,6 @@
   test/encoding/tests
   test/datetime/tests
   test/path/tests
+  test/debug/tests
   test/crypto/tests)
 
