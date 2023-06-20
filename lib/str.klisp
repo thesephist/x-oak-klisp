@@ -122,7 +122,7 @@
 
 (defn extend (pad n)
   (do
-    (def times (int (/ n (len pad))))
+    (def times (// n (len pad)))
     (def part (% n (len pad)))
     (defn -extend (base i)
       (if (zero? i)

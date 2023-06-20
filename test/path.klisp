@@ -1,2 +1,120 @@
 (def tests
-  (deftestgroup 'path'))
+  (deftestgroup 'path'
+    (deftestgroup 'abs?'
+      (deftest 'empty absolute path'
+        (path/abs? '/')
+        true)
+      (deftest 'empty relative path'
+        (path/abs? '')
+        false)
+      (deftest 'absolute path'
+        (path/abs? '/tmp/src/test.oak')
+        true)
+      (deftest 'relative path'
+        (path/abs? './src/test.oak')
+        false))
+    (deftestgroup 'rel?'
+      (deftest 'empty absolute path'
+        (path/rel? '/')
+        false)
+      (deftest 'empty relative path'
+        (path/rel? '')
+        true)
+      (deftest 'absolute path'
+        (path/rel? '/tmp/src/test.oak')
+        false)
+      (deftest 'relative path'
+        (path/rel? './src/test.oak')
+        true))
+
+    (let (test-all-match (fn (name path expect-dir expect-base)
+                           (list (deftest (str name ' with dir/base')
+                                   (list (path/dir path) (path/base path))
+                                   (list expect-dir expect-base))
+                                 (deftest (str name ' with cut')
+                                   (path/cut path)
+                                   (list expect-dir expect-base)))))
+      (deftestgroup 'path components'
+        (test-all-match 'empty path'
+                        '' '' '')
+        (test-all-match 'empty absolute path'
+                        '/' '' '')
+        (test-all-match 'relative path'
+                        './src/plugins/test.oak' './src/plugins' 'test.oak')
+        (test-all-match 'absolute path'
+                        '/home/thesephist/src/oak/README.md'
+                        '/home/thesephist/src/oak' 'README.md')
+        (test-all-match 'path ending with /'
+                        'editor/plugins/'
+                        'editor' 'plugins')
+        (test-all-match 'path ending with multiple ///'
+                        'editor/plugins///'
+                        'editor' 'plugins')))
+
+    (deftestgroup 'clean path'
+      (deftest 'empty path'
+        (path/clean '') '')
+      (deftest 'root path /'
+        (path/clean '/') '/')
+      (deftest 'dot at root'
+        (path/clean '/./') '/')
+      (deftest 'slash dot'
+        (path/clean './') '')
+      (deftest 'dot slash at root'
+        (path/clean '/./') '/')
+      (deftest 'remove trailing slashes'
+        (path/clean './iphone-13/')
+        'iphone-13')
+      (deftest 'remove consecutive slashes'
+        (path/clean 'abc//def/b.c/')
+        'abc/def/b.c')
+      (deftest 'remove "."'
+        (path/clean './hello/world/./pic.jpg')
+        'hello/world/pic.jpg')
+      (deftest 'remove ".." where possible'
+        (path/clean '../magic/a/../pocket..dir/x/y/../../x.gif')
+        '../magic/pocket..dir/x.gif')
+      (deftest 'do not collapse consecutive sequences of ".."'
+        (path/clean '../../x/../../')
+        '../../..')
+      (deftest 'correctly clean consecutive sequences of "." and ".."'
+        (path/clean '.././../one/two/./../three/.././four')
+        '../../one/four'))
+
+    (deftestgroup 'join'
+      (deftest 'no paths'
+        (path/join)
+        '')
+      (deftest '1 path'
+        (path/join '../abc')
+        '../abc')
+      (deftest '2 paths'
+        (path/join '../abc' '/def')
+        '../abc/def')
+      (deftest 'multiple paths'
+        (path/join '../abc', '/def', 'ghi', '../xyz.jpg')
+        '../abc/def/xyz.jpg'))
+    (deftestgroup 'split'
+      (deftest 'empty path'
+        (path/split '')
+        nil)
+      (deftest '/'
+        (path/split '/')
+        nil)
+      (deftest 'long path'
+        (path/split '../abc//def/ghi/../xyz.jpg')
+        (list '..' 'abc' 'def' 'ghi' '..' 'xyz.jpg')))
+    (deftestgroup 'resolve'
+      (deftest 'to /'
+        (path/resolve './src/editor.ts' '/')
+        '/src/editor.ts')
+      (deftest 'to base'
+        (path/resolve './src/editor.ts' '/home/thesephist')
+        '/home/thesephist/src/editor.ts')
+      (deftest 'absolute path cleans up path'
+        (path/resolve '/var/../etc/./nginx.default' '/var/log/nginx')
+        '/etc/nginx.default')
+      (deftest 'absolute path is a no-op for clean paths'
+        (path/resolve '/etc/nginx.default' '/var/log/nginx')
+        '/etc/nginx.default'))))
+

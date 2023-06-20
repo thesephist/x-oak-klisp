@@ -3,7 +3,7 @@
 (defn debug/bar (n)
   (let
     (n (max (list (* 8 n) 0)))
-    (whole (int (/ n 8)))
+    (whole (// n 8))
     (rem (% n 8))
     (graph (str (-> (range whole)
                     (map (constantly '█'))

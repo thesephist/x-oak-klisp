@@ -1634,7 +1634,7 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn extend (pad n)
   (do
-    (def times (int (/ n (len pad))))
+    (def times (// n (len pad)))
     (def part (% n (len pad)))
     (defn -extend (base i)
       (if (zero? i)
@@ -1815,25 +1815,29 @@ fn loadStdlib(withEnv) loadLibSources([
         (x)))
 
 (defn mean (xs)
-  (/ (sum xs) (size xs)))
+  (if (nil? xs)
+    nil
+    (/ (sum xs) (size xs))))
 
 (defn geomean (xs)
-  (# (prod xs) (/ 1 (size xs))))
+  (if (nil? xs)
+    nil
+    (# (prod xs) (/ 1 (size xs)))))
 
 (defn median (xs)
   (let
     (xs (sort xs))
     (count (size xs))
-    (half (int (/ count 2)))
+    (half (// count 2))
     (cond ((zero? count) nil)
-          ((zero? (% count 2) (/ (+ (nth xs (dec half))
-                                    (nth xs (half)))
-                                 2)))
+          ((zero? (% count 2)) (/ (+ (nth xs (dec half))
+                                     (nth xs half))
+                                  2))
           ((nth xs half)))))
 
 (defn stddev (xs)
   (let (xmean (mean xs))
-    (when (nil? xmean)
+    (unless (nil? xmean)
       (-> xs
           (map (fn (x)
                  (sq (- xmean x))))
@@ -1930,14 +1934,14 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn mergesort (xs)
   (if (< (size xs) 2)
     xs
-    (let (split-at (int (/ (size xs) 2)))
+    (let (split-at (// (size xs) 2))
       (merge (mergesort (take xs split-at))
              (mergesort (drop xs split-at))))))
 
 (defn quicksort (xs)
   (if (< (size xs) 2)
     xs
-    (let (pivot (nth xs (int (/ (dec (size xs)) 2)))) ; heuristic: pick midpoint
+    (let (pivot (nth xs (// (dec (size xs)) 2))) ; heuristic: pick midpoint
       (-> (quicksort (filter xs (partial < ? pivot)))
           (append (filter xs (is pivot)))
           (append (quicksort (filter xs (partial > ? pivot))))))))
@@ -2132,20 +2136,20 @@ fn loadStdlib(withEnv) loadLibSources([
       (,float (str x))
       (,bool (str x))
       (,list (if (comp? x)
-              (str \'{\'
-                     (-> x
-                         (map (fn (cell)
-                                (str \'"\'
-                                  (escape (str (car cell)))
-                                  \'":\'
-                                     (json/serialize (cdr cell)))))
-                         (join \',\'))
-                     \'}\')
-              (str \'[\'
-                     (-> x
-                         (map json/serialize)
-                         (join \',\'))
-                     \']\')))
+               (str \'{\'
+                    (-> x
+                        (map (fn (cell)
+                               (str \'"\'
+                                    (escape (str (car cell)))
+                                    \'":\'
+                                    (json/serialize (cdr cell)))))
+                        (join \',\'))
+                    \'}\')
+               (str \'[\'
+                    (-> x
+                        (map json/serialize)
+                        (join \',\'))
+                    \']\')))
       (\'null\'))))
 
 (defn json/parse (s)
@@ -2402,7 +2406,8 @@ fn loadStdlib(withEnv) loadLibSources([
              (str \'.\' millis)))
          (cond
            ((zero? tz-offset) \'Z\')
-           ((neg? tz-offset) (str (-> (// tz-offset 60) str (pad-start 2 \'0\'))
+           ((pos? tz-offset) (str \'+\'
+                                  (-> (// tz-offset 60) str (pad-start 2 \'0\'))
                                   \':\'
                                   (-> (% tz-offset 60) str (pad-start 2 \'0\'))))
            ((str \'-\'
@@ -2477,7 +2482,7 @@ fn loadStdlib(withEnv) loadLibSources([
     0
     (do
       (defn -last-slash (i)
-        (if (| ((nil? (nth path i)))
+        (if (| (nil? (nth path i))
                (= \'/\' (nth path i)))
           i
           (-last-slash (dec i))))
@@ -2486,7 +2491,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn path/dir (path)
   (let (path (trim-end path \'/\'))
     (-> path
-        (slice 0 (path/last-slash path)))))
+        (take (path/last-slash path)))))
 
 (defn path/base (path)
   (let (path (trim-end path \'/\'))
@@ -2497,20 +2502,22 @@ fn loadStdlib(withEnv) loadLibSources([
   (let
     (path (trim-end path \'/\'))
     (last-slash (path/last-slash path))
-    (list (slice path 0 last-slash)
+    (list (take path last-slash)
           (slice path (inc last-slash)))))
 
 (defn path/clean (path)
   (let (cleaned (-> path
                     (split \'/\')
+                    enumerate
                     (reduce nil
-                            (fn (parts part i)
+                            (fn (parts (i part))
                               (match part
                                 (\'\' parts)
                                 (\'.\' parts)
-                                (\'..\' (if (zero? i)
-                                        (<< parts part)
-                                        (slice parts 0 (dec (size parts)))))
+                                (\'..\' (match (last parts)
+                                        (nil (<< parts part))
+                                        (\'..\' (<< parts part))
+                                        ((take parts (dec (size parts))))))
                                 ((<< parts part)))))
                     (join \'/\')))
     (if (path/abs? path)
@@ -2598,6 +2605,7 @@ fn loadStdlib(withEnv) loadLibSources([
 
 (defn test/make-test-group (name tests)
   (-> tests
+      test/flatten-tree
       (map (fn (t)
              (do
                (nth! t 1
@@ -2631,7 +2639,7 @@ fn loadStdlib(withEnv) loadLibSources([
 (defn debug/bar (n)
   (let
     (n (max (list (* 8 n) 0)))
-    (whole (int (/ n 8)))
+    (whole (// n 8))
     (rem (% n 8))
     (graph (str (-> (range whole)
                     (map (constantly \'█\'))
@@ -2651,16 +2659,15 @@ fn loadStdlib(withEnv) loadLibSources([
       \'▏\'
       graph)))
 
-
-
 (defn debug/histo (xs bars cols)
   (if (zero? (size xs))
     \'\'
     (do
-      (default bars (size xs))
+      (default bars 10)
       (default cols 80)
       (def xmin (min xs))
       (def xmax (max xs))
+      (def bars (clamp bars 1 (size xs)))
       (def unit (/ (- xmax xmin) bars))
       (def buckets (-> (range bars)
                        (map (fn (i)

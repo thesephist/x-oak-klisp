@@ -164,7 +164,8 @@
              (str '.' millis)))
          (cond
            ((zero? tz-offset) 'Z')
-           ((neg? tz-offset) (str (-> (// tz-offset 60) str (pad-start 2 '0'))
+           ((pos? tz-offset) (str '+'
+                                  (-> (// tz-offset 60) str (pad-start 2 '0'))
                                   ':'
                                   (-> (% tz-offset 60) str (pad-start 2 '0'))))
            ((str '-'

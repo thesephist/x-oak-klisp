@@ -1,18 +1,238 @@
 (def tests
   (deftestgroup 'math'
-    (deftest '//'
-      (// 10 3)
-      3)
-    (deftest 'variadic //'
-      (// 100 3 5)
-      6)
-    (deftest 'round'
-      (-> (range 6)
-          (map (partial round π ?)))
-      (list 3
-            3.1
-            3.14
-            3.142
-            3.1416
-            3.14159))))
+    (deftestgroup '//'
+      (deftest 'binary'
+        (// 10 3)
+        3)
+      (deftest 'variadic'
+        (// 100 3 5)
+        6))
+
+    (deftest 'double'
+      (-> (list -5 0 12)
+          (map double))
+      (list -10 0 24))
+    (deftest 'sq'
+      (-> (list -5 0 12)
+          (map sq))
+      (list 25 0 144))
+
+    (deftestgroup 'close?'
+      (deftest 'default'
+        (close? π 3.14159265358979)
+        true)
+      (deftest 'against integer'
+        (close? 12.0 12)
+        true)
+      (deftest 'with exact integers'
+        (close? 12.0 12.0)
+        true)
+      (deftest 'with custom epsilon'
+        (close? 12 15 3.5)
+        true))
+
+    (deftestgroup 'hypot'
+      (deftest 'from origin'
+        (close? (hypot 5 12)
+                13)
+        true)
+      (deftest 'from -origin'
+        (close? (hypot -5 -12)
+                13)
+        true)
+      (deftest 'from custom origin'
+        (close? (hypot -2 -4 3 8)
+                13)
+        true)
+      (deftest 'from custom -origin'
+        (close? (hypot 2 4 -3 -8)
+                13)
+        true))
+
+    (deftestgroup 'scale'
+      (deftest '<min to [0, 1]'
+        (scale -10 0 10) -1)
+      (deftest 'min to [0, 1]'
+        (scale 0 0 10) 0)
+      (deftest 'max to [0, 1]'
+        (scale 10 0 10) 1)
+      (deftest 'mid to [0, 1]'
+        (scale 5 0 10) 0.5)
+      (deftest '>max to [0, 1]'
+        (scale 20 0 10) 2)
+      (deftest '<min to [0, 1] in range < 0'
+        (scale 10 0 -10) -1)
+      (deftest 'min to [0, 1] in range < 0'
+        (scale 0 0 -10) 0)
+      (deftest 'max to [0, 1] in range < 0'
+        (scale -10 0 -10) 1)
+      (deftest 'mid to [0, 1] in range < 0'
+        (scale -5 0 -10) 0.5)
+      (deftest '>max to [0, 1] in range < 0'
+        (scale -20 0 -10) 2)
+      (deftest '<min to [50, 100]'
+        (scale -10 0 10 50 100) 0)
+      (deftest 'min to [50, 100]'
+        (scale 0 0 10 50 100) 50)
+      (deftest 'max to [50, 100]'
+        (scale 10 0 10 50 100) 100)
+      (deftest 'mid to [50, 100]'
+        (scale 5 0 10 50 100) 75)
+      (deftest '>max to [50, 100]'
+        (scale 20 0 10 50 100) 150)
+      (deftest '<min to [-50, -100]'
+        (scale -10 0 10 -50 -100) 0)
+      (deftest 'min to [-50, -100]'
+        (scale 0 0 10 -50 -100) -50)
+      (deftest 'max to [-50, -100]'
+        (scale 10 0 10 -50 -100) -100)
+      (deftest 'mid to [-50, -100]'
+        (scale 5 0 10 -50 -100) -75)
+      (deftest '>max to [-50, -100]'
+        (scale 20 0 10 -50 -100) -150)
+      (deftest 'to 0'
+        (scale 7 0 10 0 0) 0)
+      (deftest 'to singularity'
+        (scale 7 0 10 12 12) 12))
+
+    (deftestgroup 'bearing'
+      (-> (list (list 'east' 0 10 0)
+                (list 'north' 90 0 10)
+                (list 'west' 180 -10 0)
+                (list 'south' -90 0 -10)
+                (list '30deg' 30 8.66025403 5)
+                (list '60deg' 60 5 8.66025403))
+          (map (fn ((dir th px py))
+                 (let
+                   (angle (fn (t) (/ (* t π) 180)))
+                   (origins (list (list 0 0)
+                                  (list 2 5)
+                                  (list -2 5)
+                                  (list -2 -5)))
+                   (-> origins
+                       (map (fn ((ox oy))
+                              (deftest (str dir ' from \(' ox ', ' oy '\)')
+                                (every? (zip (bearing ox oy 10 (angle th))
+                                             (list (+ ox px)
+                                                   (+ oy py))
+                                             close?))
+                                true)))))))))
+
+    (deftestgroup 'sum'
+      (deftest 'of nothing'
+        (sum nil) 0)
+      (deftest 'of 1'
+        (sum (list 42)) 42)
+      (deftest 'of many'
+        (sum (range 100)) 4950))
+    (deftestgroup 'prod'
+      (deftest 'of nothing'
+        (prod nil) 1)
+      (deftest 'of 1'
+        (prod (list 42)) 42)
+      (deftest 'of many'
+        (prod (range 1 11)) 3628800))
+
+    (let
+      (ns (list 39 254 5 -2 0 3))
+      (same (-> (range 10) (map (constantly 2))))
+      (list
+        (deftestgroup 'min'
+          (deftest 'of empty'
+            (min nil) nil)
+          (deftest 'of 1'
+            (min (list -30)) -30)
+          (deftest 'of list'
+            (min ns) -2)
+          (deftest 'of same'
+            (min same) 2))
+        (deftestgroup 'max'
+          (deftest 'of empty'
+            (max nil) nil)
+          (deftest 'of 1'
+            (max (list 100)) 100)
+          (deftest 'of list'
+            (max ns) 254)
+          (deftest 'of same'
+            (max same) 2))))
+    (deftestgroup 'clamp'
+      (deftest 'when x < a'
+        (clamp 5 10 20) 10)
+      (deftest 'when x = a'
+        (clamp 10 10 20) 10)
+      (deftest 'when a < x < b'
+        (clamp 12 10 20) 12)
+      (deftest 'when x = b'
+        (clamp 20 10 20) 20)
+      (deftest 'when x > b'
+        (clamp 50 10 20) 20))
+    (deftestgroup 'clamp string'
+      (deftest 'when x < a'
+        (clamp 'a' 'e' 'g') 'e')
+      (deftest 'when x = a'
+        (clamp 'e' 'e' 'g') 'e')
+      (deftest 'when a < x < b'
+        (clamp 'f' 'e' 'g') 'f')
+      (deftest 'when x = b'
+        (clamp 'g' 'e' 'g') 'g')
+      (deftest 'when x > b'
+        (clamp 's' 'e' 'g') 'g'))
+
+    (deftestgroup 'mean'
+      (deftest 'of empty'
+        (mean nil) nil)
+      (deftest 'of 1'
+        (mean (list 10)) 10)
+      (deftest 'of many'
+        (mean (list 1 3 5 7 12 20)) 8))
+    (deftestgroup 'median'
+      (deftest 'of empty'
+        (median nil) nil)
+      (deftest 'of 1'
+        (median (list 10)) 10)
+      (deftest 'of 2'
+        (median (list 1 4)) 2.5)
+      (deftest 'of odd-numbered list'
+        (median (list 1 3 5)) 3)
+      (deftest 'of even-numbered list'
+        (median (list 1 3 5 7)) 4)
+      (deftest 'of unsorted list'
+        (median (list 7 1 5 3)) 4))
+    (deftestgroup 'stddev'
+      (deftest 'of empty'
+        (stddev nil) nil)
+      (deftest 'of equal samples'
+        (stddev (list 3 3 3 3 3)) 0)
+      (deftest 'of many'
+        (close? (stddev (list 1.5 2.5 2.5 2.75 3.25 4.75))
+                0.9868932735)
+        true))
+
+    (deftestgroup 'round'
+      (deftest '0'
+        (round 0) 0)
+      (-> (list 2 100 -49)
+          (map (fn (n)
+                 (deftest (str 'round integer ' n)
+                   (round n)
+                   n))))
+      (let (decimals (list -5 0 1 2 4 10))
+        (-> (list (list 2.5
+                        2.5 3.0 2.5 2.5 2.5 2.5)
+                  (list -2.5
+                        -2.5 -3.0 -2.5 -2.5 -2.5 -2.5)
+                  (list 3.141592
+                        3.141592 3.0 3.1 3.14 3.1416 3.141592)
+                  (list 0.0021828
+                        0.0021828 0.0 0.0 0.0 0.0022 0.0021828)
+                  (list -694.20108
+                        -694.20108 -694.0 -694.2 -694.2 -694.2011 -694.20108))
+            (map (fn ((value . results))
+                   (-> results
+                       enumerate
+                       (map (fn ((i result))
+                              (let (decimal (nth decimals i))
+                                (deftest (str 'round ' value ' to ' decimal ' places => ' result)
+                                  (round value decimal)
+                                  result))))))))))))
 

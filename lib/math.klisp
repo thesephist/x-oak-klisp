@@ -83,25 +83,29 @@
         (x)))
 
 (defn mean (xs)
-  (/ (sum xs) (size xs)))
+  (if (nil? xs)
+    nil
+    (/ (sum xs) (size xs))))
 
 (defn geomean (xs)
-  (# (prod xs) (/ 1 (size xs))))
+  (if (nil? xs)
+    nil
+    (# (prod xs) (/ 1 (size xs)))))
 
 (defn median (xs)
   (let
     (xs (sort xs))
     (count (size xs))
-    (half (int (/ count 2)))
+    (half (// count 2))
     (cond ((zero? count) nil)
-          ((zero? (% count 2) (/ (+ (nth xs (dec half))
-                                    (nth xs (half)))
-                                 2)))
+          ((zero? (% count 2)) (/ (+ (nth xs (dec half))
+                                     (nth xs half))
+                                  2))
           ((nth xs half)))))
 
 (defn stddev (xs)
   (let (xmean (mean xs))
-    (when (nil? xmean)
+    (unless (nil? xmean)
       (-> xs
           (map (fn (x)
                  (sq (- xmean x))))
