@@ -56,6 +56,7 @@
 
 (defn test/make-test-group (name tests)
   (-> tests
+      test/flatten-tree
       (map (fn (t)
              (do
                (nth! t 1
