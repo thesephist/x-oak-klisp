@@ -83,7 +83,7 @@
     (= (type x) ,list)))
 (def list?
   (fn (x)
-    (| (= x nil)
+    (| (= (type x) ,nil)
        (= (type x) ,list))))
 
 ; identity

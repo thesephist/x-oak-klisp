@@ -1,53 +1,166 @@
 (def tests
   (deftestgroup 'json'
-    (deftest 'serialize nil'
-      (json/serialize nil)
-      'null')
-    (deftest 'serialize empty'
-      (json/serialize _)
-      'null')
-    (deftest 'serialize simple string'
-      (json/serialize 'Hello, World!')
-      '"Hello, World!"')
-    (deftest 'serialize complex string'
-      (json/serialize '("what\'s up?"\\123)')
-      '"(\\"what\'s up?\\"\\\\123)"')
-    (deftest 'serialize symbol'
-      (json/serialize (quote this-is-a-symbol))
-      '"this-is-a-symbol"')
-    (deftest 'serialize symbol with special chars'
-      (json/serialize (string->symbol '("what\'s up?"\\123)'))
-      '"(\\"what\'s up?\\"\\\\123)"')
-    (deftest 'serialize ints'
-      (-> (list 1 2 3)
-          (map json/serialize))
-      (list '1' '2' '3'))
-    (deftest 'serialize floats'
-      (-> (list 3.14 -0.003 +100000.2)
-          (map json/serialize))
-      (list '3.14' '-0.003' '100000.2'))
-    (deftest 'serialize bools'
-      (-> (list true false)
-          (map json/serialize))
-      (list 'true' 'false'))
-    (deftest 'serialize lists'
-      (json/serialize (list 1 ,a (list 10 20 30)))
-      '[1,"a",[10,20,30]]')
-    (deftest 'serialize comps'
-      (-> (list (comp)
-                (comp 1 2
-                      3 4)
-                (comp ,a (list 1 2)
-                      (list 3 4) 34))
-          (map json/serialize))
-      (list 'null' ; NOTE: empty comp is serialized as null
-            '{"1":2,"3":4}'
-            '{"a":[1,2],"(3 4)":34}'))
-    (deftest 'serialize everything combined'
-      (-> (comp 1 2
-                'three' (list 4 5 6)
-                ,hi (comp ,a ,b
-                          ,c ,d))
-          (json/serialize))
-      '{"1":2,"three":[4,5,6],"hi":{"a":"b","c":"d"}}')))
+    (deftestgroup 'serialize'
+      (deftest 'nil'
+        (json/serialize nil)
+        'null')
+      (deftest 'empty'
+        (json/serialize _)
+        'null')
+      (deftest 'empty string'
+        (json/serialize '')
+        '""')
+      (deftest 'ordinary string'
+        (json/serialize 'Hello, World!')
+        '"Hello, World!"')
+      (deftest 'string with escapes'
+        (json/serialize 'es"c \\a"pe\nme\t')
+        '"es\\"c \\\\a\\"pe\\nme\\t"')
+      (deftest 'symbol'
+        (json/serialize (quote this-is-a-symbol))
+        '"this-is-a-symbol"')
+      (deftest 'complex symbol'
+        (json/serialize (string->symbol ':_atom_THIS 2'))
+        '":_atom_THIS 2"')
+      (deftest 'complex symbol with special chars'
+        (json/serialize (string->symbol '("what\'s up?"\\123)'))
+        '"(\\"what\'s up?\\"\\\\123)"')
+      (deftest 'true'
+        (json/serialize true)
+        'true')
+      (deftest 'false'
+        (json/serialize false)
+        'false')
+      (deftest 'integer'
+        (json/serialize 12)
+        '12')
+      (deftest 'decimal number'
+        (json/serialize 3.14)
+        '3.14')
+      (deftest 'negative number'
+        (json/serialize -2.4142)
+        '-2.4142')
+      (deftest 'function => null'
+        (json/serialize (fn () ()))
+        'null')
+      (deftest 'empty list'
+        (json/serialize (list))
+        'null') ; note that this differs from Oak's behavior
+      (deftest 'empty object'
+        (json/serialize (comp))
+        'null') ; note that this differs from Oak's behavior
+      (deftest 'ordinary list'
+        (json/serialize (list 10 20 1 0 'hi' ,zero))
+        '[10,20,1,0,"hi","zero"]')
+      (deftest 'nested list'
+        (json/serialize (list 10 (list 20 30) (list nil _) (list)))
+        '[10,[20,30],[null,null],null]')
+      (deftest 'ordinary object'
+        (let
+          (serialized (json/serialize (comp ,a 'b'
+                                            ,cd -4.251)))
+          (answers (list  '{"cd":-4.251,"a":"b"}'
+                          '{"a":"b","cd":-4.251}'))
+          (contains? answers serialized)()))
+      (deftest 'nested object'
+        (let
+          (serialized (json/serialize (list 'a'
+                                            true
+                                            (comp ,c 'd'
+                                                  'e\"' 32.14)
+                                            (list 'f' (comp) nil -42))))
+          (answers (list '["a",true,{"c":"d","e\\\"":32.14},["f",{},null,-42]]'
+                         '["a",true,{"e\\\"":32.14,"c":"d"},["f",{},null,-42]]'))
+          (contains? answers serialized)())))
+
+    (deftestgroup 'parse'
+      (deftest 'empty string or whitespace'
+        (-> (list '' '\n' '  \t  ')
+            (map json/parse))
+        (list ,error ,error ,error))
+      (deftest 'null, true, false'
+        (-> (list 'null' 'true' 'false')
+            (map json/parse))
+        (list nil true false))
+      (deftest 'invalid JSON, nearly-keywords'
+        (-> (list 'nul' 'tru' 'fals   ')
+            (map json/parse))
+        (list ,error ,error ,error))
+      (deftest 'empty string'
+        (json/parse '""')
+        '')
+      (deftest 'ordinary string'
+        (json/parse '"thing 1 thing 2"')
+        'thing 1 thing 2')
+      (deftest 'escaped string'
+        (json/parse '"es\\"c \\\\a\\"pe\\nme\\t"')
+        'es"c \\a"pe\nme\t')
+      (deftest 'interrupted string'
+        (json/parse '"my\"what"')
+        'my')
+      (deftest 'orindary number'
+        (json/parse '420')
+        420)
+      (deftest 'negative number'
+        (json/parse '-69')
+        -69)
+      (deftest 'decimal number'
+        (json/parse '-59.413')
+        -59.413)
+      (deftest 'interrupted number'
+        (json/parse '10.1-2')
+        10.1)
+      (deftest 'invalid number'
+        (json/parse '1.2.3')
+        ,error)
+      (deftest 'empty list'
+        (-> (list '[]' '[\n]' '[   ]')
+            (map json/parse))
+        (list nil nil nil))
+      (deftest 'empty object'
+        (-> (list '{}' '{\n}' '{   }')
+            (map json/parse))
+        (list nil nil nil))
+      (deftest 'ordinary list'
+        (json/parse '[1, "two", 30]')
+        (list 1 'two' 30))
+      (deftest 'nested list'
+        (json/parse '[1, [2, [3]], [4, "five"]]')
+        (list 1 (list 2 (list 3)) (list 4 'five')))
+      (deftest 'ordinary object'
+        (json/parse '{"a": "bee", "c": [10, 20]}')
+        (comp 'c' (list 10 20)
+              'a' 'bee'))
+      (deftest 'nested object'
+        (json/parse '{"a": {"Key": "Value"}}')
+        (comp 'a' (comp 'Key' 'Value'))))
+
+    (deftestgroup 'round-trip tests'
+      (-> (list nil
+                100
+                'something \n\t\r wild'
+                (comp 'a' 'b'
+                      'c' -4.251
+                      'd' (list 10 20 nil))
+                (list 'a' true
+                      (comp 'c' 'd'
+                            'e' 32.14)
+                      (list 'f' nil -42))
+                (comp 'ser' 'de'
+                      '\\' 3
+                      'esc\\' 'back\\slash'
+                      'apple' 'dessert'
+                      'x' (list 'train' false
+                                'car' true
+                                (comp 'x' (list 'y' 'z')))
+                      '32' 'thirty-two'
+                      'nothing' nil))
+          (map (fn (target)
+                 (deftest (str '2x round-trip ' (take (str target) 20) '...')
+                   (-> target
+                       json/serialize
+                       json/parse
+                       json/serialize
+                       json/parse)
+                   target)))))))
 

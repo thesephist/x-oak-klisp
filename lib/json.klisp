@@ -27,7 +27,7 @@
       (,float (str x))
       (,bool (str x))
       (,list (if (comp? x)
-               (str '{'
+               (str '\{'
                     (-> x
                         (map (fn (cell)
                                (str '"'
@@ -35,12 +35,12 @@
                                     '":'
                                     (json/serialize (cdr cell)))))
                         (join ','))
-                    '}')
-               (str '['
+                    '\}')
+               (str '\['
                     (-> x
                         (map json/serialize)
                         (join ','))
-                    ']')))
+                    '\]')))
       ('null'))))
 
 (defn json/parse (s)
@@ -52,8 +52,9 @@
         (defmut index 0)
         (defmut err? false)
         (defn next ()
-          (incm! index)
-          (default (char-at s (- (getm index) 1)) ''))
+          (do
+            (incm! index)
+            (default (char-at s (- (getm index) 1)) '')))
         (defn peek ()
           (default (char-at s (getm index)) ''))
         (defn next-word (n)
@@ -86,23 +87,128 @@
                         (setm! err? true)
                         ,error))
               ,err? (fn () (getm err?)))))
+    (defmacro rcall (r fname . args)
+      (quasiquote
+        (apply (getc (unquote r) (quote (unquote fname)))
+               (unquote (cons ,list args)))))
     (defn parse-null (r)
-      ())
+      (if (= (rcall r next-word 4) 'null')
+        nil
+        (rcall r err!)))
     (defn parse-string (r)
-      ())
+      (do
+        (rcall r next) ; eat the double quote
+        (defn -parse (acc)
+          (let (c (rcall r next))
+            (match c
+              ('' (rcall r err!))
+              ('\\' (-parse (<< acc (let (c (rcall r next))
+                                      (match c
+                                        ('t' '\t')
+                                        ('n' '\n')
+                                        ('r' '\r')
+                                        ('f' '\f')
+                                        ('"' '"')
+                                        (c))))))
+              ('\"' acc)
+              ((-parse (<< acc c))))))
+        (-parse '')))
     (defn parse-number (r)
-      ())
+      (do
+        (def decimal? (defmut false))
+        (def negate? (if (= (rcall r peek) '-')
+                       (do
+                         (rcall r next)
+                         true)
+                       false))
+        (defn -parse (acc)
+          (let (c (rcall r peek))
+            (cond ((char-between? c '0' '9') (-parse (<< acc (rcall r next))))
+                  ((= c '.') (if (getm decimal?)
+                               (rcall r err!)
+                               (do
+                                 (setm! decimal? true)
+                                 (-parse (<< acc (rcall r next))))))
+                  (acc))))
+        (def result (-parse ''))
+        (let (parsed (if (getm decimal?)
+                       (float result)
+                       (int result)))
+          (if (nil? parsed)
+            ,error
+            (if negate?
+              (neg parsed)
+              parsed)))))
     (defn parse-true (r)
-      ())
+      (if (= (rcall r next-word 4) 'true')
+        true
+        (rcall r err!)))
     (defn parse-false (r)
-      ())
+      (if (= (rcall r next-word 5) 'false')
+        false
+        (rcall r err!)))
     (defn parse-list (r)
-      ())
+      (do
+        (rcall r next) ; eat the \[
+        (rcall r forward)
+        (defn -parse (acc)
+          (if (rcall r err?)
+            ,error
+            (match (rcall r peek)
+              ('' (rcall r err!))
+              ('\]' (do
+                      (rcall r next) ; eat the \]
+                      acc))
+              ((let (acc (<< acc (-parse-reader r)))
+                 (do
+                   (rcall r forward)
+                   (when (= (rcall r peek) ',')
+                     (rcall r next))
+                   (rcall r forward)
+                   (-parse acc)))))))
+        (-parse nil)))
     (defn parse-object (r)
-      ())
+      (do
+        (rcall r next) ; eat the \{
+        (rcall r forward)
+        (defn -parse (acc)
+          (if (rcall r err?)
+            ,error
+            (match (rcall r peek)
+              ('' (rcall r err!))
+              ('\}' (do
+                      (rcall r next)
+                      acc))
+              ((let (key (parse-string r))
+                 (unless (rcall r err?)
+                   (do
+                     (rcall r forward)
+                     (when (= (rcall r peek) ':')
+                       (rcall r next))
+                     (let (val (-parse-reader r))
+                       (unless (rcall r err?)
+                         (do
+                           (rcall r forward)
+                           (when (= (rcall r peek) ',')
+                             (rcall r next))
+                           (rcall r forward)
+                           (-parse (setc acc key val))))))))))))
+        (-parse (comp))))
     (defn -parse-reader (r)
-      ())
+      (do
+        (rcall r forward) ; trim preceding whitespace
+        (let (result (match (rcall r peek)
+                       ('n' (parse-null r))
+                       ('\"' (parse-string r))
+                       ('t' (parse-true r))
+                       ('f' (parse-false r))
+                       ('\[' (parse-list r))
+                       ('\{' (parse-object r))
+                       ((parse-number r))))
+          (if (rcall r err?)
+            ,error
+            result))))
     (-> s
-        (Reader)
-        (-parse-reader))))
+        Reader
+        -parse-reader)))
 
