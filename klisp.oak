@@ -557,14 +557,14 @@ Env := {
 	'#': makeNative(fn(L) L.1 |> reduceSexpr(L.0, pow))
 
 	// types and conversions
-	'type': makeNative(fn(L) if L.0 {
-		[_, _, _] -> :function
-		[_, _] -> :list
-		_ -> if ty := type(L.0) {
-			:null -> :nil
-			:atom -> :symbol
-			_ -> ty
+	'type': makeNative(fn(L) if ty := type(L.0) {
+		:null -> :nil
+		:atom -> :symbol
+		:list -> if L.0 {
+			[_, _, _] -> :function
+			[_, _] -> :list
 		}
+		_ -> ty
 	})
 	'string->int': makeNative(fn(L) int(L.0) |> default(0))
 	'string->float': makeNative(fn(L) float(L.0) |> default(0))
