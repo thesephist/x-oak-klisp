@@ -7,6 +7,5 @@
        (fib (- n 2)))))
 
 (-> (nat 20)
-    (each (fn (n)
-            (println 'Fib of' n 'is' (fib n)))))
+    (each (partial println 'Fib of' ? 'is' (fib ?))))
 
