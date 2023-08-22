@@ -11,6 +11,7 @@
 	map: map
 	find: find
 	each: each
+	merge: merge
 	reduce: reduce
 	append: append
 	entries: entries
@@ -45,6 +46,22 @@ fn unlistify(L) if L {
 	? -> []
 	_ -> append([L.0], unlistify(L.1))
 }
+
+// read from a Klisp comp
+fn readComp(L, key) if L {
+	? -> ?
+	[[key, _], _] -> L.(0).1
+	_ -> readComp(L.1, key)
+}
+
+// write to a Klisp comp
+fn writeComp(L, key, val) [[key, val], L]
+
+// Oak obj -> Klisp comp
+fn compify(x) x |> entries() |> listify()
+
+// Klisp comp -> Oak obj
+fn uncompify(L) L |> reduceSexpr({}, fn(acc, kv) acc.(kv.0) := kv.1)
 
 // like std.map, but works on lisp lists
 fn mapSexpr(L, f) {
@@ -494,13 +511,13 @@ Env := {
 		args() |> listify()
 	})
 	'env': makeNative(fn(_) {
-		env() |> entries() |> listify()
+		env() |> compify()
 	})
 	'exec': makeNative(fn(L) {
 		cmd := L.0
 		argv := unlistify(L.(1).0)
 		stdin := L.(1).(1).0
-		exec(cmd, argv, stdin) |> entries() |> listify()
+		exec(cmd, argv, stdin) |> compify()
 	})
 
 	// arithmetic and logical operators
@@ -576,7 +593,7 @@ Env := {
 
 	// I/O, system
 	'input': makeNative(fn(_) {
-		input() |> entries() |> listify()
+		input() |> compify()
 	})
 	'print': makeNative(fn(L) {
 		output := L.1 |> reduceSexpr(
@@ -593,25 +610,20 @@ Env := {
 	})
 	'fs/read': makeNative(fn(L) if type(path := L.0) {
 		:string -> fs.readFile(path)
-		_ -> ?
 	})
 	'fs/write': makeNative(fn(L) if {
 		type(path := L.0) = :string & type(file := L.(1).0) = :string ->
 			fs.writeFile(path, file)
-		_ -> ?
 	})
 	'fs/append': makeNative(fn(L) if {
 		type(path := L.0) = :string & type(file := L.(1).0) = :string ->
 			fs.appendFile(path, file)
-		_ -> ?
 	})
 	'fs/stat': makeNative(fn(L) if type(path := L.0) {
-		:string -> fs.statFile(path) |> entries() |> listify()
-		_ -> ?
+		:string -> fs.statFile(path) |> compify()
 	})
 	'fs/rm': makeNative(fn(L) if type(path := L.0) {
 		:string -> rm(path)
-		_ -> ?
 	})
 	'fs/ls': makeNative(fn(L) if type(path := L.0) {
 		:string -> {
@@ -623,26 +635,70 @@ Env := {
 				[name, [len, [mod, [dir, ?]]]]
 			}) |> listify()
 		}
-		_ -> ?
 	})
 	'fs/mkdir': makeNative(fn(L) if type(path := L.0) {
 		:string -> mkdir(path)
-		_ -> ?
 	})
-	'listen': makeNative(fn(L) {
-		// TODO: implement
-	})
+	'listen': makeNative(fn(L) makeNative(
+		if [type(host := L.0), type(handler := L.(1).0)] {
+			[:string, :list] -> with listen(host) fn(evt) if evt.type {
+				:req -> handler.(1)([
+					compify({} |> merge(evt, {
+						req: compify({} |> merge(evt.req, {
+							headers: compify(evt.req.headers)
+						}))
+						end: makeNative(fn(L) {
+							{
+								status: status
+								headers: headers
+								body: body
+							} := uncompify(L.0)
+							evt.end({
+								status: status |> default(200)
+								headers: headers |> uncompify() |> default({})
+								body: body |> default('')
+							})
+						})
+					}))
+				])
+				_ -> compify(evt) |> handler()
+			}
+			_ -> fn {}
+		}
+	))
 	'req': makeNative(fn(L) {
-		// TODO: implement
+		arg := L.0
+		method := readComp(arg, :method) |> default('GET')
+		url := readComp(arg, :url)
+		headers := readComp(arg, :headers) |> default({})
+		body := readComp(arg, :body) |> default('')
+		if [type(method), type(url), type(headers), type(body)] {
+			[:string, :string, :object, :string] -> {
+				evt := req({
+					method: method
+					url: url
+					headers: headers
+					body: body
+				})
+				if evt.type {
+					:resp -> compify({} |> merge(evt, {
+						resp: compify({} |> merge(evt.resp, {
+							headers: compify(evt.resp.headers)
+						}))
+					}))
+					_ -> compify(evt)
+				}
+			}
+		}
 	})
 
 	// runtime
 	'___runtime_gc': makeNative(___runtime_gc)
 	'___runtime_mem': makeNative(fn(_) {
-		___runtime_mem() |> entries() |> listify()
+		___runtime_mem() |> compify()
 	})
 	'___runtime_proc': makeNative(fn(_) {
-		___runtime_proc() |> entries() |> listify()
+		___runtime_proc() |> compify()
 	})
 }
 
