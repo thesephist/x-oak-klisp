@@ -670,7 +670,7 @@ Env := {
 		arg := L.0
 		method := readComp(arg, :method) |> default('GET')
 		url := readComp(arg, :url)
-		headers := readComp(arg, :headers) |> default({})
+		headers := readComp(arg, :headers) |> uncompify() |> default({})
 		body := readComp(arg, :body) |> default('')
 		if [type(method), type(url), type(headers), type(body)] {
 			[:string, :string, :object, :string] -> {
